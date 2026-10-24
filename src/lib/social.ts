@@ -6,7 +6,7 @@
 import { supabaseBrowser } from './supabase/client';
 import { isLocal } from './data';
 import type { Exercise } from './types';
-
+import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js';
 export interface UserLite { id: string; username: string; display_name: string | null; avatar: string; level: number; league?: string; streak: number; weekly_xp: number; xp?: number; last_active_date?: string | null }
 export interface SearchResult extends UserLite { relation: 'none' | 'friend' | 'sent' | 'incoming' | 'blocked' }
 export interface Friend extends UserLite { friendship_id: number; since: string; xp: number }
@@ -81,13 +81,41 @@ export async function markNotificationsRead(ids?: number[]) {
   if (ids?.length) q = q.in('id', ids);
   await q;
 }
-export function subscribeNotifications(userId: string, onNew: (n: Notification) => void) {
+
+export function subscribeNotifications(
+  userId: string,
+  onNew: (n: Notification) => void
+) {
   if (isLocal()) return () => {};
-  const ch = supabaseBrowser().channel(`notif:${userId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (p) => onNew(p.new as Notification))
+
+  const sb = supabaseBrowser();
+  const channelName = `notif:${userId}:${crypto.randomUUID()}`;
+
+  const ch = sb
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      },
+      (
+        payload: RealtimePostgresInsertPayload<
+          Record<string, unknown>
+        >
+      ) => {
+        onNew(payload.new as unknown as Notification);
+      }
+    )
     .subscribe();
-  return () => { ch.unsubscribe(); };
+
+  return () => {
+    void sb.removeChannel(ch);
+  };
 }
+
 
 // ---------- Faollik ----------
 export async function fetchFeed(limit = 40): Promise<Activity[]> {
