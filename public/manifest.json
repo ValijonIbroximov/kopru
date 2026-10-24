@@ -1,0 +1,13 @@
+{
+  "name": "Köprü — Turk tili akademiyasi",
+  "short_name": "Köprü",
+  "description": "O'zbeklar uchun o'yinli, sun'iy intellektli turk tili o'rganish platformasi",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#07090f",
+  "theme_color": "#ff6a2a",
+  "lang": "uz",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

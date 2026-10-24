@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #07090f;
+  --panel: #0d1117;
+  --line: rgba(255, 255, 255, 0.07);
+}
+
+html, body {
+  background: var(--bg);
+  color: #e8ecf1;
+  min-height: 100%;
+}
+body {
+  background-image:
+    radial-gradient(1200px 600px at 10% -10%, rgba(255, 106, 42, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(20, 184, 166, 0.10), transparent 60%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+* { -webkit-tap-highlight-color: transparent; }
+::selection { background: rgba(255, 106, 42, 0.35); }
+
+@layer components {
+  .card { @apply rounded-3xl border border-white/[0.07] bg-ink-900/80 shadow-card backdrop-blur; }
+  .card-soft { @apply rounded-2xl border border-white/[0.06] bg-white/[0.03]; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none; }
+  .btn-primary { @apply btn bg-gradient-to-r from-ember-500 to-rose-500 text-white shadow-glow hover:brightness-110; }
+  .btn-secondary { @apply btn bg-white/[0.06] text-ink-100 border border-white/10 hover:bg-white/[0.1]; }
+  .btn-ghost { @apply btn text-ink-300 hover:text-white hover:bg-white/[0.05]; }
+  .btn-teal { @apply btn bg-teal-500 text-ink-950 hover:bg-teal-400; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-ink-200; }
+  .input { @apply w-full rounded-2xl border border-white/10 bg-ink-800 px-4 py-3 text-base text-white outline-none placeholder:text-ink-400 focus:border-ember-400/60 focus:ring-2 focus:ring-ember-500/20; }
+  .label { @apply mb-1 block text-xs font-medium uppercase tracking-wider text-ink-400; }
+  .option { @apply w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-left text-base font-medium text-ink-100 transition hover:bg-white/[0.08] active:scale-[0.99]; }
+  .option-correct { @apply border-teal-400 bg-teal-500/20 text-white; }
+  .option-wrong { @apply border-rose-500 bg-rose-500/15 text-white animate-shake; }
+  .option-dim { @apply opacity-40; }
+  .title { @apply font-display text-2xl font-bold tracking-tight text-white sm:text-3xl; }
+  .subtitle { @apply text-sm text-ink-300; }
+  .kbd { @apply rounded-md border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-ink-200; }
+  .prose-uz h1, .prose-uz h2, .prose-uz h3 { @apply mt-4 mb-2 font-display font-bold text-white; }
+  .prose-uz h2 { @apply text-lg; }
+  .prose-uz h3 { @apply text-base; }
+  .prose-uz p { @apply my-2 leading-relaxed text-ink-100; }
+  .prose-uz ul { @apply my-2 list-disc pl-5 text-ink-100; }
+  .prose-uz li { @apply my-1; }
+  .prose-uz strong { @apply text-ember-300; }
+  .prose-uz table { @apply my-3 w-full text-sm; }
+  .prose-uz th { @apply border-b border-white/10 px-2 py-1 text-left text-ink-300; }
+  .prose-uz td { @apply border-b border-white/5 px-2 py-1; }
+  .prose-uz code { @apply rounded bg-white/10 px-1 text-ember-300; }
+}
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { scrollbar-width: none; }
+
+.confetti-piece {
+  position: fixed;
+  top: -10px;
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confetti 2.4s ease-in forwards;
+  pointer-events: none;
+  z-index: 60;
+}
