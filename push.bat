@@ -1,152 +1,185 @@
+
 @echo off
-setlocal EnableExtensions DisableDelayedExpansion
-cd /d "%~dp0"
+setlocal EnableExtensions
+title KOPRU - Automatic GitHub PUSH
+
 set "REPO=https://github.com/ValijonIbroximov/kopru.git"
 set "BRANCH=main"
 set "AUTHOR=Valijon Ibroximov"
 set "EMAIL=valijonibroximov@gmail.com"
+set "MSG=Kopru automatic update"
+
+cd /d "%~dp0" || goto failed
+
 echo.
 echo ===============================================
 echo    KOPRU - Automatic GitHub PUSH
 echo ===============================================
 echo Folder: %CD%
 echo Repo: %REPO%
+echo Branch: main
 echo.
 
-where git >nul 2>&1
-if errorlevel 1 (
-  echo [1/7] Git not found. Installing via winget...
-  where winget >nul 2>&1
-  if errorlevel 1 (
-    echo ERROR: winget is not available. Install Git from https://git-scm.com/download/win
-    goto :failed
-  )
-  winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements --silent
-  if errorlevel 1 goto :failed
-  set "PATH=%ProgramFiles%\Git\cmd;%ProgramFiles(x86)%\Git\cmd;%LocalAppData%\Programs\Git\cmd;%PATH%"
-  where git >nul 2>&1
-  if errorlevel 1 (
-    echo Git installed, but executable not found. Reopen the script or restart Windows.
-    goto :failed
-  )
-)
-git --version
+call :checkgit
+if errorlevel 1 goto failed
 
-echo.
-echo [2/7] Configuring identity...
-git config --global user.name "%AUTHOR%"
-if errorlevel 1 goto :failed
-git config --global user.email "%EMAIL%"
-if errorlevel 1 goto :failed
+echo [1/7] Checking repository...
 
-REM Accept only this project's repository.
 git rev-parse --is-inside-work-tree >nul 2>&1
 if errorlevel 1 (
-  echo ZIP folder detected: creating Git metadata without deleting your files...
-  git init -b %BRANCH%
-  if errorlevel 1 goto :failed
-  git remote add origin "%REPO%"
-  if errorlevel 1 goto :failed
-  git fetch origin %BRANCH%
-  if errorlevel 1 goto :failed
-  REM Align the INDEX with the remote snapshot, never overwrite working files.
-  git reset --mixed origin/%BRANCH%
-  if errorlevel 1 goto :failed
-  git branch -M %BRANCH%
-  if errorlevel 1 goto :failed
-  git branch --set-upstream-to=origin/%BRANCH% %BRANCH% >nul 2>&1
+    echo ERROR: Not a Git repository.
+    echo.
+    echo If downloaded as ZIP, run pull.bat first.
+    echo It will create a separate Git clone.
+    goto failed
 )
 
-for /f "delims=" %%R in ('git rev-parse --show-toplevel 2^>nul') do set "ROOT=%%R"
-if /I not "%ROOT%"=="%CD%" (
-  echo ERROR: Place this file in the ROOT of the Kopru project.
-  echo Git root: %ROOT%
-  goto :failed
-)
-for /f "delims=" %%U in ('git remote get-url origin 2^>nul') do set "REMOTE_URL=%%U"
-if not defined REMOTE_URL (
-  git remote add origin "%REPO%"
-  if errorlevel 1 goto :failed
-) else (
-  if /I not "%REMOTE_URL%"=="%REPO%" if /I not "%REMOTE_URL%"=="https://github.com/ValijonIbroximov/kopru" (
-    echo ERROR: origin points to another repository: %REMOTE_URL%
-    echo No remote was changed.
-    goto :failed
-  )
+for /f "delims=" %%G in ('git rev-parse --show-toplevel') do set "ROOT=%%G"
+
+for %%G in ("%ROOT%") do set "ROOT=%%~fG"
+for %%G in ("%CD%") do set "CURRENT=%%~fG"
+
+if /I not "%ROOT%"=="%CURRENT%" (
+    echo ERROR: This BAT must be in Git root.
+    echo Git root: %ROOT%
+    goto failed
 )
 
-echo.
-echo [3/7] Fetching remote history...
-git fetch origin %BRANCH%
-if errorlevel 1 goto :failed
-for /f "delims=" %%B in ('git branch --show-current') do set "CURRENT_BRANCH=%%B"
-if /I not "%CURRENT_BRANCH%"=="%BRANCH%" (
-  echo ERROR: Current branch is %CURRENT_BRANCH%, expected %BRANCH%.
-  goto :failed
-)
-REM Never push over unmerged changes or rewrite remote commits.
-git ls-files -u | findstr /r "." >nul
-if not errorlevel 1 (
-  echo ERROR: Resolve existing merge conflicts first.
-  goto :failed
-)
-for /f %%N in ('git rev-list --count HEAD..origin/%BRANCH%') do set "BEHIND=%%N"
-if not "%BEHIND%"=="0" (
-  echo.
-  echo WARNING: GitHub contains %BEHIND% newer commit(s).
-  echo Local files will NOT be overwritten.
-  echo First synchronize with pull.bat or manually merge your changes.
-  goto :failed
-)
+echo [2/7] Configuring identity...
 
-echo.
-echo [4/7] Changed files:
-git status --short
-if errorlevel 1 goto :failed
-REM Stage all changes and reject secret files before committing.
-echo.
-echo [5/7] Staging and scanning sensitive paths...
-git add -A
-if errorlevel 1 goto :failed
-for %%S in (.env .env.local .env.production .env.development .env.test) do (
-  git ls-files --error-unmatch "%%S" >nul 2>&1
-  if not errorlevel 1 (
-    echo ERROR: Sensitive file %%S is tracked or staged. Remove from Git index before pushing.
-    goto :failed
-  )
-)
-REM Check nested .env files as well.
-git ls-files | findstr /i /r "\(^\|/\)\.env\($\|\.\)" >nul
-if not errorlevel 1 (
-  echo ERROR: Possible tracked .env file detected. Review git ls-files before pushing.
-  goto :failed
-)
-git diff --cached --quiet
+git config user.name "%AUTHOR%"
+if errorlevel 1 goto failed
+
+git config user.email "%EMAIL%"
+if errorlevel 1 goto failed
+
+echo [3/7] Configuring GitHub...
+
+git remote get-url origin >nul 2>&1
 if errorlevel 1 (
-  echo.
-  echo [6/7] Creating automatic commit...
-  git commit -m "Kopru: automatic update %DATE% %TIME%"
-  if errorlevel 1 goto :failed
+    git remote add origin "%REPO%"
 ) else (
-  echo [6/7] No new changes to commit.
+    git remote set-url origin "%REPO%"
 )
+if errorlevel 1 goto failed
+
+git fetch origin main
+if errorlevel 1 goto failed
+
+echo [4/7] Checking main branch...
+
+git show-ref --verify --quiet refs/heads/main
+if errorlevel 1 (
+    echo ERROR: Local main branch is missing.
+    echo Use pull.bat to initialize a proper clone.
+    goto failed
+)
+
+git switch main
+if errorlevel 1 (
+    echo ERROR: Cannot switch to main.
+    echo Check local uncommitted changes.
+    goto failed
+)
+
+echo [5/7] Checking secret files...
+
+git ls-files -co --exclude-standard -- ".env" ".env.*" "*.pem" "*.key" "*.p12" > "%TEMP%\kopru-secrets-%RANDOM%.txt"
+
+set "SECRETFILE="
+for /f "delims=" %%F in ('git ls-files -co --exclude-standard -- ".env" ".env.*" "*.pem" "*.key" "*.p12"') do (
+    if /I not "%%~nxF"==".env.example" (
+        if /I not "%%~nxF"==".env.sample" (
+            if /I not "%%~nxF"==".env.template" (
+                set "SECRETFILE=%%F"
+                goto secretfound
+            )
+        )
+    )
+)
+
+goto stage
+
+:secretfound
 echo.
-echo [7/7] Pushing to GitHub...
-git push -u origin %BRANCH%
-if errorlevel 1 goto :failed
+echo ERROR: Possible secret file found.
+echo File: %SECRETFILE%
+echo.
+echo Review and exclude it before pushing.
+goto failed
+
+:stage
+echo [6/7] Staging and committing changes...
+
+git add -A
+if errorlevel 1 goto failed
+
+git diff --cached --quiet
+if not errorlevel 1 goto sync
+
+git commit -m "%MSG%"
+if errorlevel 1 goto failed
+
+:sync
+echo [7/7] Synchronizing and pushing main...
+
+git fetch origin main
+if errorlevel 1 goto failed
+
+git merge --ff-only origin/main
+if errorlevel 1 (
+    echo.
+    echo ERROR: Local and remote histories diverged.
+    echo Your commit was preserved locally.
+    echo Merge or rebase is required.
+    goto failed
+)
+
+git push -u origin main
+if errorlevel 1 goto failed
+
 echo.
 echo ===============================================
-echo SUCCESS: Kopru synchronized with GitHub.
+echo    PUSH SUCCESSFUL - origin/main
 echo ===============================================
-git log -1 --format="Commit: %%h - %%s"
+git log -1 --oneline
+echo.
+echo GitHub:
+echo https://github.com/ValijonIbroximov/kopru
 echo.
 pause
 exit /b 0
+
+:checkgit
+git --version >nul 2>&1
+if not errorlevel 1 exit /b 0
+
+echo Git not installed.
+echo Installing via winget...
+
+where winget >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: winget unavailable.
+    exit /b 1
+)
+
+winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
+if errorlevel 1 exit /b 1
+
+set "PATH=%PATH%;C:\Program Files\Git\cmd"
+
+git --version >nul 2>&1
+if errorlevel 1 (
+    echo Restart terminal after installing Git.
+    exit /b 1
+)
+
+exit /b 0
+
 :failed
 echo.
 echo ===============================================
-echo STOPPED: No force push or destructive reset used.
-echo Check error messages above.
+echo PUSH STOPPED - No force push used
 echo ===============================================
 echo.
 pause
