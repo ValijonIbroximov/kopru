@@ -7,18 +7,19 @@ import { SrsSession } from '@/lib/srs-client';
 import type { Word } from '@/lib/types';
 import { shuffle, cn } from '@/lib/utils';
 import { speak } from '@/lib/speech';
+import { useLang } from '@/lib/i18n';
 
 const HOWTO = [
-  { icon: '🔡', title: 'Harflar aralash', text: 'O‘zbekcha ma’no (va 🔊 ovoz) beriladi. Pastdagi aralash harflardan turkcha so‘zni to‘g‘ri tartibda tering.' },
-  { icon: '👆', title: 'Harfni bosing', text: 'Harf yuqoriga ko‘chadi. Xato bo‘lsa — yuqoridagi harfni bosib qaytaring yoki ⌫ tugmasi.' },
-  { icon: '💡', title: 'Ishora', text: 'Ishora keyingi harfni o‘z joyiga qo‘yadi, lekin ball kamayadi. 10 ta so‘z, har biri 10 ball, ishorasiz = +5 bonus.' },
+  { icon: '🔡', title: { uz: 'Harflar aralash', tr: 'Harfler karışık' }, text: { uz: 'O‘zbekcha ma’no (va 🔊 ovoz) beriladi. Aralash harflardan turkcha so‘zni to‘g‘ri tartibda tering.', tr: 'Özbekçe anlam (ve 🔊 ses) verilir. Karışık harflerden Türkçe kelimeyi doğru sırayla dizin.' } },
+  { icon: '👆', title: { uz: 'Harfni bosing', tr: 'Harfe basın' }, text: { uz: 'Harf yuqoriga ko‘chadi. Xato bo‘lsa — yuqoridagi harfni bosib qaytaring yoki ⌫.', tr: 'Harf yukarı taşınır. Hata varsa — üstteki harfe basıp geri alın ya da ⌫.' } },
+  { icon: '💡', title: { uz: 'Ishora', tr: 'İpucu' }, text: { uz: 'Ishora keyingi harfni joyiga qo‘yadi, lekin ball kamayadi. 10 so‘z, har biri 10 ball, ishorasiz = +5.', tr: 'İpucu sonraki harfi yerine koyar ama puan düşer. 10 kelime, her biri 10 puan, ipucusuz = +5.' } },
 ];
 
 interface Tile { id: number; ch: string }
 
 function Anagram({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
   const words = useMemo(() => {
-    const ok = (data.words.length >= 10 ? data.words : data.allWords).filter((w) => /^[a-zçğıöşüâîû]{3,10}$/i.test(w.tr));
+    const ok = (data.words.length >= 6 ? data.words : data.allWords).filter((w) => /^[a-zçğıöşüâîû]{3,10}$/i.test(w.tr));
     return shuffle(ok).slice(0, 10);
   }, [data]);
   const [i, setI] = useState(0);
@@ -33,6 +34,7 @@ function Anagram({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => vo
   const started = useRef(Date.now());
   const shownAt = useRef(Date.now());
   const mistakes = useRef<{ tr: string; uz: string }[]>([]);
+  const { l, t } = useLang();
   const w: Word | undefined = words[i];
 
   useEffect(() => { srs.load(); }, [srs]);
@@ -67,7 +69,7 @@ function Anagram({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => vo
   function advance() {
     if (i + 1 >= words.length) {
       onEnd({ score, correct, total: words.length, xp: Math.min(40, correct * 3), durationSec: Math.round((Date.now() - started.current) / 1000), perfect: correct === words.length, mistakes: mistakes.current,
-        details: [{ label: 'So‘zlar', value: `${correct}/${words.length}` }] });
+        details: [{ label: { uz: 'So‘zlar', tr: 'Kelimeler' }, value: `${correct}/${words.length}` }] });
     } else setI(i + 1);
   }
   function pick(t: Tile) { if (status !== 'play') return; const next = [...chosen, t]; setChosen(next); setPool(pool.filter((x) => x.id !== t.id)); check(next); }
@@ -94,7 +96,7 @@ function Anagram({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => vo
     <div>
       <Hud score={score} extra={<span className="card-soft px-3 py-1.5 text-xs text-ink-300">{i + 1}/{words.length}</span>} />
       <div className="card-soft p-5 text-center">
-        <div className="text-[10px] uppercase tracking-wider text-ink-400">Ma’nosi</div>
+        <div className="text-[10px] uppercase tracking-wider text-ink-400">{t('meaning')}</div>
         <div className="font-display text-2xl font-bold text-ember-300">{w.uz}</div>
         <div className="mt-2 flex justify-center gap-2"><SpeakButton text={w.tr} size="sm" /><span className="chip">{w.pos}</span>{w.cognate && !w.false_friend && <span className="chip text-teal-300">🌉 {w.cognate}</span>}</div>
       </div>
@@ -116,9 +118,9 @@ function Anagram({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => vo
         {pool.map((t) => <button key={t.id} type="button" onClick={() => pick(t)} className="grid h-14 w-12 place-items-center rounded-2xl border border-white/15 bg-ink-800 text-2xl font-bold uppercase text-white shadow-card transition hover:border-white/40 active:scale-95">{t.ch}</button>)}
       </div>
       <div className="mt-6 flex justify-center gap-2">
-        <button className="btn-secondary" onClick={() => { const last = chosen[chosen.length - 1]; if (last) unpick(last); }} disabled={!chosen.length || status !== 'play'}><Delete size={16} /> O‘chirish</button>
-        <button className="btn-secondary" onClick={hint} disabled={status !== 'play'}><Lightbulb size={16} /> Ishora (−2)</button>
-        <button className="btn-ghost text-xs" onClick={giveUp} disabled={status !== 'play'}>Bilmadim</button>
+        <button className="btn-secondary" onClick={() => { const last = chosen[chosen.length - 1]; if (last) unpick(last); }} disabled={!chosen.length || status !== 'play'}><Delete size={16} /> {l({ uz: 'O‘chirish', tr: 'Sil' })}</button>
+        <button className="btn-secondary" onClick={hint} disabled={status !== 'play'}><Lightbulb size={16} /> {l({ uz: 'Ishora', tr: 'İpucu' })} (−2)</button>
+        <button className="btn-ghost text-xs" onClick={giveUp} disabled={status !== 'play'}>{l({ uz: 'Bilmadim', tr: 'Bilmiyorum' })}</button>
       </div>
       {status === 'ok' && <div className="mt-3 text-center text-sm text-teal-300">✓ {w.tr}{w.example_tr ? ` — ${w.example_tr}` : ''}</div>}
     </div>
@@ -127,7 +129,7 @@ function Anagram({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => vo
 
 export default function AnagramPage() {
   return (
-    <GameShell id="anagram" title="Harf terish" icon="🔡" desc="Imlo refleksi: aralash harflardan turkcha so‘zni tering. ç ğ ı ö ş ü harflari bilan do‘stlashing." howTo={HOWTO} minWords={10}>
+    <GameShell id="anagram" title={{ uz: 'Harf terish', tr: 'Harf dizme' }} icon="🔡" desc={{ uz: 'Imlo refleksi: aralash harflardan turkcha so‘zni tering. ç ğ ı ö ş ü harflari bilan do‘stlashing.', tr: 'Yazım refleksi: karışık harflerden Türkçe kelimeyi dizin. ç ğ ı ö ş ü ile dost olun.' }} howTo={HOWTO} minWords={8}>
       {(data, onEnd) => <Anagram data={data} onEnd={onEnd} />}
     </GameShell>
   );

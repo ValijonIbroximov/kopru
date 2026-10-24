@@ -48,17 +48,18 @@ export function formatNumber(n: number) {
   return new Intl.NumberFormat('uz-UZ').format(n);
 }
 
-export function relativeDay(dateStr: string | null, tz = 'Asia/Tashkent') {
-  if (!dateStr) return 'hech qachon';
+export function relativeDay(dateStr: string | null, tz = 'Asia/Tashkent', lang: 'uz' | 'tr' = 'uz') {
+  const tr = lang === 'tr';
+  if (!dateStr) return tr ? 'hiç' : 'hech qachon';
   const today = todayKey(tz);
-  if (dateStr === today) return 'bugun';
+  if (dateStr === today) return tr ? 'bugün' : 'bugun';
   const d = new Date(dateStr + 'T00:00:00');
   const t = new Date(today + 'T00:00:00');
   const diff = Math.round((t.getTime() - d.getTime()) / 86400000);
-  if (diff === 1) return 'kecha';
-  if (diff < 7) return `${diff} kun oldin`;
-  if (diff < 30) return `${Math.floor(diff / 7)} hafta oldin`;
-  return `${Math.floor(diff / 30)} oy oldin`;
+  if (diff === 1) return tr ? 'dün' : 'kecha';
+  if (diff < 7) return tr ? `${diff} gün önce` : `${diff} kun oldin`;
+  if (diff < 30) return tr ? `${Math.floor(diff / 7)} hafta önce` : `${Math.floor(diff / 7)} hafta oldin`;
+  return tr ? `${Math.floor(diff / 30)} ay önce` : `${Math.floor(diff / 30)} oy oldin`;
 }
 
 /** Oddiy, barqaror xesh (kesh kaliti uchun) */

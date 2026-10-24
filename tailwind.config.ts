@@ -6,18 +6,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Mavzuga bog'liq: CSS o'zgaruvchilar (src/lib/themes.ts). `white` = matn rangi (fg):
+        // qorong'i mavzuda oq, yorug' mavzuda to'q — shu tufayli butun UI avtomatik moslashadi.
+        white: 'rgb(var(--fg) / <alpha-value>)',
         ink: {
-          950: '#07090f',
-          900: '#0d1117',
-          800: '#141a24',
-          700: '#1c2431',
-          600: '#2a3444',
-          500: '#3d4a5e',
-          400: '#6b7a90',
-          300: '#9aa6b8',
-          200: '#c9d1dc',
-          100: '#e8ecf1',
+          950: 'rgb(var(--ink-950) / <alpha-value>)',
+          900: 'rgb(var(--ink-900) / <alpha-value>)',
+          800: 'rgb(var(--ink-800) / <alpha-value>)',
+          700: 'rgb(var(--ink-700) / <alpha-value>)',
+          600: 'rgb(var(--ink-600) / <alpha-value>)',
+          500: 'rgb(var(--ink-500) / <alpha-value>)',
+          400: 'rgb(var(--ink-400) / <alpha-value>)',
+          300: 'rgb(var(--ink-300) / <alpha-value>)',
+          200: 'rgb(var(--ink-200) / <alpha-value>)',
+          100: 'rgb(var(--ink-100) / <alpha-value>)',
         },
+        accent: 'rgb(var(--accent) / <alpha-value>)',
+        accent2: 'rgb(var(--accent-2) / <alpha-value>)',
         ember: {
           300: '#ffb27a',
           400: '#ff8f4d',

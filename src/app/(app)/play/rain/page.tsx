@@ -5,17 +5,18 @@ import { SrsSession } from '@/lib/srs-client';
 import type { Word } from '@/lib/types';
 import { shuffle, cn } from '@/lib/utils';
 import { speak } from '@/lib/speech';
+import { useLang } from '@/lib/i18n';
 
 const HOWTO = [
-  { icon: '🌧️', title: 'So‘zlar yog‘yapti', text: 'Tepada o‘zbekcha so‘z ko‘rsatiladi. Yuqoridan turkcha so‘zlar tushadi — ulardan TO‘G‘RI tarjimani bosing.' },
-  { icon: '❤️', title: '3 jon', text: 'Noto‘g‘ri so‘zni bossangiz yoki to‘g‘ri so‘z pastga tushib ketsa — 1 jon ketadi. Jonlar tugasa o‘yin tugaydi.' },
-  { icon: '🚀', title: 'Tezlashadi', text: 'Har 5 ta to‘g‘ri javobdan keyin yomg‘ir tezlashadi. 25 ta so‘zni ushlang — g‘alaba! Yuqoriroqda ushlasangiz ko‘proq ball.' },
+  { icon: '🌧️', title: { uz: 'So‘zlar yog‘yapti', tr: 'Kelimeler yağıyor' }, text: { uz: 'Tepada o‘zbekcha so‘z. Yuqoridan turkcha so‘zlar tushadi — TO‘G‘RI tarjimani bosing.', tr: 'Üstte Özbekçe kelime. Yukarıdan Türkçe kelimeler düşer — DOĞRU çeviriye basın.' } },
+  { icon: '❤️', title: { uz: '3 jon', tr: '3 can' }, text: { uz: 'Noto‘g‘ri so‘zni bossangiz yoki to‘g‘ri so‘z pastga tushib ketsa — 1 jon ketadi.', tr: 'Yanlış kelimeye basarsanız ya da doğru kelime aşağı düşerse — 1 can gider.' } },
+  { icon: '🚀', title: { uz: 'Tezlashadi', tr: 'Hızlanır' }, text: { uz: 'Har 5 to‘g‘ridan keyin yomg‘ir tezlashadi. 25 so‘z — g‘alaba! Yuqorida ushlasangiz ko‘proq ball.', tr: 'Her 5 doğrudan sonra yağmur hızlanır. 25 kelime — zafer! Yukarıda yakalarsanız daha çok puan.' } },
 ];
 
 interface Drop { id: number; word: Word; x: number; y: number; speed: number; correct: boolean; dying?: 'ok' | 'bad' }
 
 function Rain({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
-  const pool = useMemo(() => shuffle(data.words.length >= 12 ? data.words : data.allWords), [data]);
+  const pool = useMemo(() => shuffle(data.words.length >= 8 ? data.words : data.allWords), [data]);
   const [target, setTarget] = useState<Word>(pool[0]);
   const [drops, setDrops] = useState<Drop[]>([]);
   const [score, setScore] = useState(0);
@@ -27,6 +28,7 @@ function Rain({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void 
   const dropsRef = useRef<Drop[]>([]);
   const srs = useMemo(() => new SrsSession('rain'), []);
   const targetShown = useRef(Date.now());
+  const { l } = useLang();
 
   useEffect(() => { srs.load(); }, [srs]);
 
@@ -41,7 +43,7 @@ function Rain({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void 
     st.current.ended = true;
     const s = st.current;
     onEnd({ score: s.score, correct: s.caught, total: s.caught + s.wrongTaps + (3 - s.lives), xp: Math.min(50, s.caught * 2), durationSec: Math.round((Date.now() - s.started) / 1000), perfect: s.caught >= 25 && s.lives === 3,
-      details: [{ label: 'Ushlangan', value: s.caught }, { label: 'Daraja', value: s.level }, { label: 'Jon', value: s.lives }], mistakes: s.mistakes });
+      details: [{ label: { uz: 'Ushlangan', tr: 'Yakalanan' }, value: s.caught }, { label: { uz: 'Daraja', tr: 'Seviye' }, value: s.level }, { label: { uz: 'Jon', tr: 'Can' }, value: s.lives }], mistakes: s.mistakes });
   }, [onEnd]);
 
   // o'yin sikli
@@ -110,7 +112,7 @@ function Rain({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void 
     <div>
       <Hud score={score} lives={lives} combo={combo} extra={<span className="card-soft px-3 py-1.5 text-xs text-ink-300">🎯 {caught}/25 · L{st.current.level}</span>} />
       <div className={cn('card-soft mb-2 p-3 text-center', shake && 'animate-shake border-rose-500/50')}>
-        <div className="text-[10px] uppercase tracking-wider text-ink-400">Toping (turkchasi)</div>
+        <div className="text-[10px] uppercase tracking-wider text-ink-400">{l({ uz: 'Toping (turkchasi)', tr: 'Bulun (Türkçesi)' })}</div>
         <div className="font-display text-2xl font-bold text-ember-300">{target.uz}</div>
       </div>
       <div className="relative h-[58vh] min-h-[380px] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-sky-950/60 via-ink-900 to-ink-950">
@@ -125,7 +127,7 @@ function Rain({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void 
           </button>
         ))}
         <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-rose-900/50 to-transparent" />
-        <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-rose-300/70">— pastga tushsa jon ketadi —</div>
+        <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-rose-300/70">{l({ uz: '— pastga tushsa jon ketadi —', tr: '— aşağı düşerse can gider —' })}</div>
       </div>
     </div>
   );
@@ -133,7 +135,7 @@ function Rain({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void 
 
 export default function RainPage() {
   return (
-    <GameShell id="rain" title="So‘z yomg‘iri" icon="🌧️" desc="Reaksiya o‘yini: tushayotgan turkcha so‘zlardan ko‘rsatilgan o‘zbekcha so‘zning tarjimasini ushlang. 3 jon, 25 so‘z, tezlashuvchi yomg‘ir." howTo={HOWTO} minWords={12}>
+    <GameShell id="rain" title={{ uz: 'So‘z yomg‘iri', tr: 'Kelime yağmuru' }} icon="🌧️" desc={{ uz: 'Reaksiya o‘yini: tushayotgan turkcha so‘zlardan ko‘rsatilgan o‘zbekcha so‘zning tarjimasini ushlang. 3 jon, 25 so‘z.', tr: 'Refleks oyunu: düşen Türkçe kelimelerden gösterilen Özbekçe kelimenin çevirisini yakalayın. 3 can, 25 kelime.' }} howTo={HOWTO} minWords={8}>
       {(data, onEnd) => <Rain data={data} onEnd={onEnd} />}
     </GameShell>
   );

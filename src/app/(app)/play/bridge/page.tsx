@@ -6,11 +6,12 @@ import { SrsSession } from '@/lib/srs-client';
 import type { Word } from '@/lib/types';
 import { shuffle, cn } from '@/lib/utils';
 import { speak } from '@/lib/speech';
+import { useLang } from '@/lib/i18n';
 
 const HOWTO = [
-  { icon: '🌉', title: 'Ko‘prikni saqlang', text: 'Yashirin turkcha so‘z (o‘zbekcha ma’nosi beriladi). Harflarni bosib so‘zni toping. Har noto‘g‘ri harf — ko‘prikdan bir taxta tushadi.' },
-  { icon: '🪵', title: '6 ta taxta', text: '6 ta xato — ko‘prik qulaydi, so‘z ochiladi va keyingisiga o‘tasiz. Turkcha harflar (ç ğ ı ö ş ü) klaviaturada bor.' },
-  { icon: '💎', title: 'Ball', text: 'Topilgan so‘z: 10 + qolgan taxtalar ×2. 8 ta so‘z. Xatosiz so‘z = +5 bonus. Ovozni (🔊) eshitish mumkin — bu ishora!' },
+  { icon: '🌉', title: { uz: 'Ko‘prikni saqlang', tr: 'Köprüyü koruyun' }, text: { uz: 'Yashirin turkcha so‘z (o‘zbekcha ma’nosi beriladi). Harflarni bosib so‘zni toping. Har noto‘g‘ri harf — bir taxta tushadi.', tr: 'Gizli Türkçe kelime (Özbekçe anlamı verilir). Harflere basıp kelimeyi bulun. Her yanlış harf — bir tahta düşer.' } },
+  { icon: '🪵', title: { uz: '6 ta taxta', tr: '6 tahta' }, text: { uz: '6 ta xato — ko‘prik qulaydi, so‘z ochiladi. Turkcha harflar klaviaturada bor.', tr: '6 hata — köprü yıkılır, kelime açılır. Türkçe harfler klavyede var.' } },
+  { icon: '💎', title: { uz: 'Ball', tr: 'Puan' }, text: { uz: 'Topilgan so‘z: 10 + qolgan taxtalar ×2. 8 ta so‘z. Xatosiz = +5. 🔊 eshitish — ishora (−2).', tr: 'Bulunan kelime: 10 + kalan tahtalar ×2. 8 kelime. Hatasız = +5. 🔊 dinleme — ipucu (−2).' } },
 ];
 
 const KEYS = ['a', 'b', 'c', 'ç', 'd', 'e', 'f', 'g', 'ğ', 'h', 'ı', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'ö', 'p', 'r', 's', 'ş', 't', 'u', 'ü', 'v', 'y', 'z'];
@@ -26,6 +27,7 @@ function Bridge({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
   const [listened, setListened] = useState(false);
   const st = useRef({ correct: 0, started: Date.now(), shown: Date.now(), mistakes: [] as { tr: string; uz: string }[] });
   const srs = useMemo(() => new SrsSession('bridge'), []);
+  const { l, t } = useLang();
   useEffect(() => { srs.load(); }, [srs]);
   const w = words[i];
   useEffect(() => { setGuessed(new Set()); setWrong(0); setStatus('play'); setListened(false); st.current.shown = Date.now(); }, [i]);
@@ -60,7 +62,7 @@ function Bridge({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
   function next() {
     if (i + 1 >= words.length) {
       const s = st.current;
-      onEnd({ score, correct: s.correct, total: words.length, xp: Math.min(40, s.correct * 4), durationSec: Math.round((Date.now() - s.started) / 1000), perfect: s.correct === words.length, mistakes: s.mistakes, details: [{ label: 'So‘zlar', value: `${s.correct}/${words.length}` }] });
+      onEnd({ score, correct: s.correct, total: words.length, xp: Math.min(40, s.correct * 4), durationSec: Math.round((Date.now() - s.started) / 1000), perfect: s.correct === words.length, mistakes: s.mistakes, details: [{ label: { uz: 'So‘zlar', tr: 'Kelimeler' }, value: `${s.correct}/${words.length}` }] });
     } else setI(i + 1);
   }
 
@@ -80,14 +82,14 @@ function Bridge({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
             </g>;
           })}
           <rect x={0} y={86} width={320} height={6} rx={3} fill="rgba(255,255,255,0.15)" />
-          <text x={160} y={104} textAnchor="middle" fontSize="11" fill={planks <= 2 ? '#fb6f92' : '#9aa6b8'}>{status === 'lost' ? 'Ko‘prik quladi…' : `${planks} taxta qoldi`}</text>
+          <text x={160} y={104} textAnchor="middle" fontSize="11" fill={planks <= 2 ? '#fb6f92' : '#9aa6b8'}>{status === 'lost' ? l({ uz: 'Ko‘prik quladi…', tr: 'Köprü yıkıldı…' }) : l({ uz: `${planks} taxta qoldi`, tr: `${planks} tahta kaldı` })}</text>
           <text x={14 + (planks / MAX) * 290} y={30} fontSize="18">🚶</text>
         </svg>
       </div>
       <div className="card-soft p-4 text-center">
-        <div className="text-[10px] uppercase tracking-wider text-ink-400">Ma’nosi</div>
+        <div className="text-[10px] uppercase tracking-wider text-ink-400">{t('meaning')}</div>
         <div className="font-display text-2xl font-bold text-ember-300">{w.uz}</div>
-        <div className="mt-2 flex items-center justify-center gap-2 text-xs text-ink-400"><span className="chip">{w.pos}</span><span className="chip">{letters.length} harf</span><button className="chip" onClick={() => { setListened(true); speak(w.tr); }}>🔊 eshitish (−2)</button></div>
+        <div className="mt-2 flex items-center justify-center gap-2 text-xs text-ink-400"><span className="chip">{w.pos}</span><span className="chip">{letters.length} {l({ uz: 'harf', tr: 'harf' })}</span><button className="chip" onClick={() => { setListened(true); speak(w.tr); }}>🔊 {t('listen').toLowerCase()} (−2)</button></div>
       </div>
       <div className={cn('mt-5 flex flex-wrap justify-center gap-1.5', status === 'lost' && 'animate-shake')}>
         {letters.map((c, k) => (
@@ -103,9 +105,9 @@ function Bridge({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
       </div>
       {status !== 'play' && (
         <div className={cn('mt-4 rounded-2xl p-3 text-sm', status === 'won' ? 'bg-teal-500/15 text-teal-200' : 'bg-rose-500/15 text-rose-200')}>
-          <div className="flex items-center justify-between"><span>{status === 'won' ? '✓ Topdingiz: ' : '✗ So‘z: '}<b className="text-white">{w.tr}</b> — {w.uz}</span><SpeakButton text={w.tr} size="sm" /></div>
+          <div className="flex items-center justify-between"><span>{status === 'won' ? l({ uz: '✓ Topdingiz: ', tr: '✓ Buldunuz: ' }) : l({ uz: '✗ So‘z: ', tr: '✗ Kelime: ' })}<b className="text-white">{w.tr}</b> — {w.uz}</span><SpeakButton text={w.tr} size="sm" /></div>
           {w.example_tr && <div className="mt-1 text-xs text-ink-200">{w.example_tr} — {w.example_uz}</div>}
-          <button className={cn('btn mt-2 w-full', status === 'won' ? 'btn-teal' : 'bg-rose-500 text-white')} onClick={next}>Keyingi so‘z <span className="kbd ml-1 hidden sm:inline">Enter</span></button>
+          <button className={cn('btn mt-2 w-full', status === 'won' ? 'btn-teal' : 'bg-rose-500 text-white')} onClick={next}>{l({ uz: 'Keyingi so‘z', tr: 'Sonraki kelime' })} <span className="kbd ml-1 hidden sm:inline">Enter</span></button>
         </div>
       )}
     </div>
@@ -114,7 +116,7 @@ function Bridge({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
 
 export default function BridgePage() {
   return (
-    <GameShell id="bridge" title="So‘z ko‘prigi" icon="🌉" desc="Hangman uslubida: harflarni toping, ko‘prik buzilmasin. Turkcha imlo va harflar bilan ishlash uchun ideal." howTo={HOWTO} minWords={8}>
+    <GameShell id="bridge" title={{ uz: 'So‘z ko‘prigi', tr: 'Kelime köprüsü' }} icon="🌉" desc={{ uz: 'Hangman uslubida: harflarni toping, ko‘prik buzilmasin. Turkcha imlo va harflar bilan ishlash uchun ideal.', tr: 'Adam asmaca tarzında: harfleri bulun, köprü yıkılmasın. Türkçe yazım ve harflerle çalışmak için ideal.' }} howTo={HOWTO} minWords={8}>
       {(data, onEnd) => <Bridge data={data} onEnd={onEnd} />}
     </GameShell>
   );

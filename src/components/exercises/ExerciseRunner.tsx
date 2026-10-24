@@ -10,6 +10,7 @@ import { Bar, Confetti } from '@/components/ui';
 import { ENCOURAGE, CONSOLE } from '@/lib/motivation';
 import { cn } from '@/lib/utils';
 import { speak } from '@/lib/speech';
+import { useLang } from '@/lib/i18n';
 import {
   IntroView, ChoiceView, TypingView, MatchView, OrderView, ListenView, SpeakView, HarmonyView, FillView, TrueFalseView,
 } from './ExerciseViews';
@@ -36,6 +37,7 @@ interface Props {
 export default function ExerciseRunner({ exercises, mode, lessonId = null, title, exitHref = '/dashboard', resume, onFinish, requeueWrong = true }: Props) {
   const router = useRouter();
   const { settings } = useProfile();
+  const { t, l } = useLang();
   const [state, setState] = useState<RunnerState>(() => resume?.state ?? { queue: exercises, index: 0, results: [], requeued: [], startedAt: Date.now() });
   const [sessionId, setSessionId] = useState<string | null>(resume?.id ?? null);
   const [answered, setAnswered] = useState<{ correct: boolean; detail?: string } | null>(null);
@@ -143,11 +145,11 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
   const feedbackMsg = useMemo(() => {
     if (!answered) return '';
     const arr = answered.correct ? ENCOURAGE : CONSOLE;
-    return arr[Math.floor(Math.random() * arr.length)];
+    return l(arr[Math.floor(Math.random() * arr.length)]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answered]);
 
-  if (!current || finished) return <div className="mx-auto max-w-xl py-10 text-center text-ink-300">Yakunlanmoqda…</div>;
+  if (!current || finished) return <div className="mx-auto max-w-xl py-10 text-center text-ink-300">{t('finishing')}</div>;
 
   const view = (() => {
     const p = { onAnswer: handleAnswer, answered: Boolean(answered) };
@@ -169,7 +171,7 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
     <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-xl flex-col">
       <Confetti run={Boolean(answered?.correct && combo > 0 && combo % 5 === 0)} />
       <div className="mb-4 flex items-center gap-3">
-        <button className="btn-ghost -ml-2 px-2 py-2" onClick={() => router.push(exitHref)} title="Chiqish (progress saqlanadi)"><X size={20} /></button>
+        <button className="btn-ghost -ml-2 px-2 py-2" onClick={() => router.push(exitHref)} title={t('exit_saved')}><X size={20} /></button>
         <Bar value={pct} color="bg-gradient-to-r from-ember-500 to-rose-500" className="h-3" />
         <div className={cn('flex items-center gap-1 text-sm font-bold', combo >= 3 ? 'text-ember-400' : 'text-ink-400')}><Flame size={16} /> {combo}</div>
         <div className="text-sm font-bold text-gold-300">+{xp}</div>
@@ -183,12 +185,18 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
           <div className="mx-auto max-w-xl">
             <div className={cn('font-display text-lg font-bold', answered.correct ? 'text-teal-300' : 'text-rose-300')}>{answered.correct ? '✓ ' : '✗ '}{feedbackMsg}</div>
             {answered.detail && <div className="mt-1 text-sm text-ink-100">{answered.detail}</div>}
-            {current.explain && current.type !== 'intro' && <div className="mt-1 text-sm text-ink-200">{current.explain}</div>}
+            {current.explain && current.type !== 'intro' && (
+              <div className="mt-1 flex items-start gap-2 text-sm text-ink-200">
+                {/* misol jumlasi (turkcha qismi) — eshitish */}
+                {/^[^—]+ — /.test(current.explain) && <button type="button" className="chip shrink-0 py-0.5 text-teal-300" title="🔊" onClick={() => speak(current.explain!.split(' — ')[0])}>🔊</button>}
+                <span>{current.explain}</span>
+              </div>
+            )}
             {!answered.correct && current.type !== 'intro' && 'tts' in current && current.tts && (
-              <button className="mt-1 text-xs text-ink-300 underline" onClick={() => speak(String(current.tts))}>🔊 eshitish</button>
+              <button className="mt-1 text-xs text-ink-300 underline" onClick={() => speak(String(current.tts))}>🔊 {t('listen').toLowerCase()}</button>
             )}
             <button className={cn('btn mt-3 w-full text-base', answered.correct ? 'btn-teal' : 'bg-rose-500 text-white')} onClick={next}>
-              {state.index + 1 >= total ? 'Yakunlash' : 'Davom etish'} <span className="kbd ml-1 hidden sm:inline">Enter</span>
+              {state.index + 1 >= total ? t('finish') : t('continue')} <span className="kbd ml-1 hidden sm:inline">Enter</span>
             </button>
           </div>
         </div>

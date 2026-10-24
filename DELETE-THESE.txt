@@ -1,0 +1,8 @@
+# Bu fayllarni loyihadan O'CHIRING (endi ishlatilmaydi):
+src/components/visual/SceneBackground.tsx
+src/components/visual/scenes.ts
+
+# Windows (loyiha papkasida):
+#   del src\components\visual\SceneBackground.tsx src\components\visual\scenes.ts
+# macOS/Linux:
+#   rm src/components/visual/SceneBackground.tsx src/components/visual/scenes.ts

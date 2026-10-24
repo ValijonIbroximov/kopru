@@ -34,7 +34,7 @@ export const PROVIDERS: ProviderDef[] = [
     id: 'openrouter', label: 'OpenRouter', url: 'https://openrouter.ai/api/v1/chat/completions',
     envKey: 'OPENROUTER_API_KEY', envModel: 'OPENROUTER_MODEL', defaultModel: 'meta-llama/llama-3.3-70b-instruct:free',
     signupUrl: 'https://openrouter.ai/keys', note: '":free" modellar bepul (kuniga ~50–200 so‘rov).',
-    extraHeaders: { 'HTTP-Referer': 'https://kopru.app', 'X-Title': 'Kopru' },
+    extraHeaders: { 'HTTP-Referer': 'https://tezbil.vercel.app', 'X-Title': 'TezBil' },
   },
   {
     id: 'mistral', label: 'Mistral', url: 'https://api.mistral.ai/v1/chat/completions',

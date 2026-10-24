@@ -1,8 +1,11 @@
-# 🌉 Köprü — Turk tili akademiyasi (o‘zbeklar uchun)
+# ⚡ TezBil — Turk tili akademiyasi (o‘zbeklar uchun)
+
+**© VALIJON IBROXIMOV**
 
 > O‘yinli, sun’iy intellektli, to‘liq statistikali turk tili o‘rganish platformasi.
 > Maqsad: **Milliy sertifikat (Multi-level, A1 → C1)**. Tez boshlab, keyin shijoati so‘nib qoladigan odamlar uchun yaratilgan.
-> Stack: **Next.js 15 + Supabase (bepul) + Vercel (bepul) + 5 ta bepul AI provayder**. Infratuzilma narxi: **0 so‘m**.
+> Stack: **Next.js 15 + Supabase (bepul) + Vercel (bepul) + 5 ta bepul AI provayder + Microsoft neyron TTS (bepul)**. Infratuzilma narxi: **0 so‘m**.
+> Interfeys: **O‘zbekcha / Turkcha**. Dizayn: **7 ta mavzu** (qorong‘i va yorug‘), har foydalanuvchi o‘ziga sozlaydi.
 
 ---
 
@@ -12,12 +15,16 @@
 |---|---|
 | 🧠 **Xotira** | FSRS-4.5 (Anki’ning zamonaviy algoritmi) — har so‘z aynan unutish arafasida qaytadi |
 | 🌉 **Ko‘prik effekti** | O‘zbek–turk qarindosh so‘zlar (q→k, o‘→ö, g‘→ğ, j→c…) va **yolg‘on do‘stlar** (olmak=bo‘lmoq, bulmak=topmoq, hazır=tayyor, dede=bobo…) |
-| 🎮 **13 ta rejim** | Dars, Takrorlash, Juftlash, Jumla quruvchi, Uyg‘unlik, Tinglash, Gapirish, AI hikoya, Duel (real vaqt), AI o‘qituvchi, Grammatika, Qarindosh so‘zlar, Sinov imtihoni |
+| 🎮 **21 ta rejim** | Dars, Takrorlash, Juftlash, Jumla quruvchi, Uyg‘unlik, Tinglash, Gapirish, AI hikoya, Duel (real vaqt), AI o‘qituvchi, Grammatika, Qarindosh so‘zlar, Sinov imtihoni |
 | 🔥 **Gamifikatsiya** | XP, darajalar, streak + muzlatish, kunlik/haftalik questlar, 18 ta yutuq, 4 liga (haftalik), combo, konfetti |
 | 📉 **Zerikish detektori** | Faollik trendi, aniqlik, rejim monotoniyasi → sessiya qisqaradi, yangi rejim tavsiya qilinadi, qaytganda XP ×2 |
 | 🤖 **AI (bepul)** | Groq → Gemini → Cerebras → OpenRouter → Mistral zanjiri. Limit tugasa keyingisi; hammasi tugasa — **kesh + navbat** (hech narsa yo‘qolmaydi) |
 | 📊 **Statistika** | Faollik xaritasi, so‘z boyligi (yangi/o‘rganilmoqda/takrorlashda/mukammal), ko‘nikmalar aniqligi, qiziqishlar, xato so‘zlar, motivatsiya indeksi, sertifikatga tayyorlik |
 | 🛠️ **Admin panel** | Foydalanuvchilar, kontent (bo‘lim/dars/so‘z/grammatika/mashq/quest/yutuq) — qo‘shish, tahrirlash, o‘chirish, JSON import/eksport; AI provayderlar; tizim sozlamalari; loglar; fikrlar |
+| 🗺️ **Moslashuvchan reja** | Maqsad daraja + imtihon sanasi → kuniga nechta so‘z, qaysi o‘yin, qachon sinov imtihoni; har kun qayta hisoblanadi (oldinda / reja bo‘yicha / ortda) |
+| 🔊 **Tabiiy turkcha nutq** | Microsoft neyron ovozlar (Emel / Ahmet) server orqali, Supabase Storage keshi, Google TTS va brauzer ovozi zaxirada |
+| 🎨 **Mavzular** | 7 ta dizayn (Tun, Grafit, Binafsha, Tong, Osmon, Qog‘oz, Yashil), jonli canvas fon (neyron tarmoq, harflar, to‘lqinlar), To‘liq/Yengil/O‘chiq |
+| 🌐 **Ko‘p tillilik** | Interfeys O‘zbekcha va Turkcha; birinchi kirishda va profilda tanlanadi |
 | 📱 **PWA** | Telefon bosh ekraniga o‘rnatiladi, mobil-birinchi dizayn |
 | 💾 **Sessiya tiklanishi** | Har javobdan keyin holat saqlanadi — chiqib ketsangiz ham aynan shu joydan davom etasiz |
 
@@ -184,11 +191,17 @@ src/lib/fsrs.ts          FSRS-4.5 rejalashtiruvchi
 src/lib/turkish.ts       unli/undosh uyg'unligi, yumshash, qo'shimchalar, o'xshashlik, tovush mosliklari
 src/lib/exercises.ts     mashq generatorlari (dars, takrorlash, boss, duel, imtihon…)
 src/lib/motivation.ts    zerikish detektori, rejim rotatsiyasi, flow kanali
+src/lib/plan.ts          moslashuvchan reja dvigateli (sur'at, kerakli tezlik, 7 kunlik jadval, bosqichlar)
+src/lib/themes.ts        7 ta mavzu: CSS o'zgaruvchilar + canvas fon parametrlari + boot skript
+src/lib/i18n.tsx         UZ/TR lug'at, LangProvider, useLang (t/l), LangSwitch
+src/lib/speech.ts        TTS/STT: /api/tts (neyron) → brauzer zaxirasi; ovoz tanlovi
+src/lib/tts/edge.ts      Microsoft Edge neyron TTS protokoli (WebSocket), Google TTS zaxirasi
+src/app/api/tts          audio keshi: xotira → Supabase Storage (tts bucket) → sintez
 src/lib/ai/              provayderlar, promptlar, shlyuz (zanjir + cooldown + kesh + navbat)
 src/lib/data.ts          yagona ma'lumot qatlami (Supabase yoki localStorage demo)
 src/components/exercises ExerciseRunner (dvigatel), 10 ta mashq ko'rinishi, SessionEnd, GamePage
 src/app/(app)/           dashboard, learn, play/[mode], story, duel, tutor, exam, stats, leaderboard, profile, admin/*
-src/app/api/             ai, ai/jobs, cron/daily, health
+src/app/api/             ai, ai/jobs, tts, cron/daily, health
 ```
 
 **Xavfsizlik:** RLS hamma jadvalda; foydalanuvchi XP/role/streak ni to‘g‘ridan-to‘g‘ri o‘zgartira olmaydi (`protect_profile_columns` triggeri) — faqat RPC orqali; AI kalitlari faqat serverda; `service_role` brauzerga chiqmaydi.
@@ -203,7 +216,7 @@ src/app/api/             ai, ai/jobs, cron/daily, health
 | Login’dan keyin qayta login’ga qaytaradi | Supabase *URL Configuration* da Site URL / Redirect URL noto‘g‘ri; Vercel env’da `NEXT_PUBLIC_SUPABASE_*` tekshiring |
 | AI "sozlanmagan" deydi | Vercel env’da `*_API_KEY` yo‘q yoki noto‘g‘ri; `/api/health` ga qarang; env o‘zgargach **Redeploy** |
 | AI "Model/so‘rov xatosi (404)" | Provayder model nomini o‘zgartirgan — Admin → AI → Model maydonini yangilang |
-| Turkcha ovoz chiqmaydi | Chrome/Edge ishlating; Android’da *Google Text-to-speech* → Türkçe ovozni yuklang; iOS’da Sozlamalar → Accessibility → Spoken Content → Voices → Turkish |
+| Turkcha ovoz chiqmaydi / sifati past | `supabase/migrations/003_tts_storage.sql` ishga tushirilganmi? `/api/tts?text=merhaba` ni brauzerda oching — mp3 kelishi kerak. Profil → Ovoz → Emel/Ahmet. Zaxira: Chrome/Edge brauzer ovozi (Android: *Google Text-to-speech* → Türkçe) |
 | Mikrofon ishlamaydi | Faqat HTTPS (Vercel’da bor) va Chrome/Edge/Safari; ruxsat bering |
 | Cron ishlamayapti | Vercel → Settings → Cron Jobs; `CRON_SECRET` env mavjudligi; Hobby rejada kuniga 1 marta |
 | `permission denied` SQL xatosi | schema.sql ni to‘liq, bir marta, yuqoridan pastgacha ishga tushiring |
@@ -215,11 +228,12 @@ src/app/api/             ai, ai/jobs, cron/daily, health
 - Push-bildirishnomalar (web-push, VAPID).
 - Klub/jamoa musobaqalari (duel kodini guruhga kengaytirish).
 - Sertifikat formatidagi to‘liq rasmiy namunalar (uzbmb.uz materiallari asosida) — Admin → Kontent → mashqlar.
-- Ovozli hikoyalar uchun tashqi TTS (Edge TTS) — brauzer ovozi yetarli bo‘lmasa.
+- Ovozli hikoyalar — AI hikoyani to‘liq audio-kitob sifatida (TTS allaqachon bor, faqat bo‘lim-bo‘lim o‘qish kerak).
+- Interfeysga yangi tillar (rus, ingliz) — `src/lib/i18n.tsx` da `Lang` turi va `DICT`ga ustun qo‘shish kifoya.
 
 ---
 
-© Valijon Ibroximov · Köprü — "O‘zbekdan turkka — o‘yin orqali"
+© VALIJON IBROXIMOV · TezBil — "O‘zbekdan turkka — tez va o‘yin orqali"
 
 ---
 
@@ -232,3 +246,18 @@ src/app/api/             ai, ai/jobs, cron/daily, health
 - **Onboarding**: 5 qadamli usta, bosh sahifa coach-mark sayohati, kontekstli maslahatlar, murabbiy takliflari, kunlik 3 qadamli reja.
 - **Grafika**: 8 ta animatsion manzara (har kirishda boshqasi, kun vaqtiga mos osmon), parallax, scroll-reveal, yangi landing. Profil → Ko‘rinish: To‘liq/Yengil/O‘chiq.
 - `push.bat` — Windows’da bir bosishda commit + push.
+
+---
+
+## 10. 3-yangilanish (v3) — qisqacha
+
+> To‘liq tavsif va o‘rnatish ketma-ketligi: **UPDATE-3.md**. Majburiy qadamlar: `npm install` (yangi paket `ws`) va Supabase SQL Editor → `003_tts_storage.sql` va `004_public_profile.sql` → Run.
+
+- **Nom: TezBil**, muallif **© VALIJON IBROXIMOV** (logo, manifest, barcha sahifalar).
+- **Xato tuzatildi**: `cannot add postgres_changes callbacks … after subscribe()` — bitta realtime kanal ikki marta ochilayotgan edi; endi bitta provayder, noyob kanal nomlari, to‘g‘ri yopish, xato chegarasi (`error.tsx`).
+- **Tabiiy turkcha nutq**: Microsoft neyron ovozlar (Emel/Ahmet) → `/api/tts` → Supabase Storage kesh; zaxira Google TTS → brauzer.
+- **Moslashuvchan reja** (`/plan`): maqsad daraja, imtihon sanasi, kunlik daqiqa → kerakli sur‘at, 7 kunlik jadval, bosqichlar, tuzatish maslahatlari; bosh sahifadagi «Bugungi reja» shundan oziqlanadi.
+- **7 ta dizayn mavzusi** + jonli canvas fon (namunaviy kod asosida), birinchi kirishda tanlash, profilda jonli oldindan ko‘rish; yorug‘ mavzular uchun butun interfeys avtomatik moslashadi.
+- **Interfeys tili: O‘zbekcha / Turkcha** — onboarding, yon panel va profilda almashtiriladi, profilga saqlanadi.
+- **O‘yinlarda faqat o‘rganilgan so‘zlar** (havza paneli: «faqat o‘rganilgan» / «yangi so‘zlar ham»), misol jumlalarini 🔊 eshitish.
+- **Reyting → profil**: statistikada umumiy reyting, `/u/username` ochiq profil, do‘st qo‘shish, chat, chaqiriq, klubga taklif.

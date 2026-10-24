@@ -4,18 +4,21 @@ import GameShell, { Hud, type GameData, type GameResult } from '@/components/gam
 import { SrsSession } from '@/lib/srs-client';
 import { shuffle, cn } from '@/lib/utils';
 import { speak } from '@/lib/speech';
+import { useLang } from '@/lib/i18n';
 
 const HOWTO = [
-  { icon: '🃏', title: '16 ta yopiq karta', text: '8 ta turkcha va 8 ta o‘zbekcha so‘z yopiq holda. Ikkitasini ochib, tarjima juftini topishga harakat qiling.' },
-  { icon: '🧠', title: 'Eslab qoling', text: 'Juft bo‘lmasa kartalar yana yopiladi — qayerda nima turganini eslang. Bu xotira + so‘z boyligi mashqi.' },
-  { icon: '⭐', title: 'Kam yurish — ko‘p ball', text: 'Har juft +10. 20 yurishdan kam bo‘lsa bonus. Vaqt ham hisoblanadi. 3 raund.' },
+  { icon: '🃏', title: { uz: '16 ta yopiq karta', tr: '16 kapalı kart' }, text: { uz: '8 ta turkcha va 8 ta o‘zbekcha so‘z yopiq. Ikkitasini ochib, tarjima juftini toping.', tr: '8 Türkçe ve 8 Özbekçe kelime kapalı. İkisini açıp çeviri eşini bulun.' } },
+  { icon: '🧠', title: { uz: 'Eslab qoling', tr: 'Hatırlayın' }, text: { uz: 'Juft bo‘lmasa kartalar yopiladi — qayerda nima turganini eslang.', tr: 'Eş değilse kartlar kapanır — neyin nerede olduğunu hatırlayın.' } },
+  { icon: '⭐', title: { uz: 'Kam yurish — ko‘p ball', tr: 'Az hamle — çok puan' }, text: { uz: 'Har juft +10. 20 yurishdan kam bo‘lsa bonus. 3 raund.', tr: 'Her eş +10. 20 hamleden azsa bonus. 3 tur.' } },
 ];
 
 interface Card { id: number; pairId: number; text: string; side: 'tr' | 'uz'; wordId: number }
 
 function Memory({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
-  const rounds = 3; const pairs = 8;
-  const deck = useMemo(() => shuffle(data.words.length >= pairs * rounds ? data.words : data.allWords).slice(0, pairs * rounds), [data]);
+  const pairs = 8;
+  // raundlar soni o'rganilgan so'zlar soniga qarab: 8 → 1, 16 → 2, 24+ → 3 (yangi so'zlar aralashmaydi)
+  const rounds = Math.max(1, Math.min(3, Math.floor(data.words.length / pairs)));
+  const deck = useMemo(() => shuffle(data.words.length >= pairs ? data.words : data.allWords).slice(0, pairs * rounds), [data, rounds]);
   const [round, setRound] = useState(0);
   const [cards, setCards] = useState<Card[]>([]);
   const [open, setOpen] = useState<number[]>([]);
@@ -30,6 +33,7 @@ function Memory({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
   const totalPairs = useRef(0);
   const srs = useMemo(() => new SrsSession('memory'), []);
   const seenPair = useRef<Map<number, number>>(new Map());
+  const { l } = useLang();
 
   useEffect(() => { srs.load(); }, [srs]);
   useEffect(() => {
@@ -62,7 +66,7 @@ function Memory({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
             setTimeout(() => {
               if (round + 1 >= rounds) {
                 onEnd({ score: score + 10 + (tries === 0 ? 5 : 0) + bonus, correct: totalPairs.current, total: totalPairs.current + Math.max(0, totalMoves.current - totalPairs.current), xp: Math.min(45, 15 + totalPairs.current), durationSec: Math.round((Date.now() - started.current) / 1000),
-                  details: [{ label: 'Juftlar', value: totalPairs.current }, { label: 'Yurishlar', value: totalMoves.current }, { label: 'Samaradorlik', value: Math.round((totalPairs.current / Math.max(1, totalMoves.current)) * 100) + '%' }] });
+                  details: [{ label: { uz: 'Juftlar', tr: 'Eşler' }, value: totalPairs.current }, { label: { uz: 'Yurishlar', tr: 'Hamleler' }, value: totalMoves.current }, { label: { uz: 'Samaradorlik', tr: 'Verimlilik' }, value: Math.round((totalPairs.current / Math.max(1, totalMoves.current)) * 100) + '%' }] });
               } else setRound(round + 1);
             }, 700);
           }
@@ -78,7 +82,7 @@ function Memory({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
 
   return (
     <div>
-      <Hud score={score} extra={<><span className="card-soft px-3 py-1.5 text-xs text-ink-300">Raund {round + 1}/{rounds}</span><span className="card-soft px-3 py-1.5 text-xs text-ink-300">Yurish {moves}</span><span className="card-soft px-3 py-1.5 text-xs text-ink-300">Juft {matched.size}/{pairs}</span></>} />
+      <Hud score={score} extra={<><span className="card-soft px-3 py-1.5 text-xs text-ink-300">{l({ uz: 'Raund', tr: 'Tur' })} {round + 1}/{rounds}</span><span className="card-soft px-3 py-1.5 text-xs text-ink-300">{l({ uz: 'Yurish', tr: 'Hamle' })} {moves}</span><span className="card-soft px-3 py-1.5 text-xs text-ink-300">{l({ uz: 'Juft', tr: 'Eş' })} {matched.size}/{pairs}</span></>} />
       <div className="grid grid-cols-4 gap-2">
         {cards.map((c) => {
           const isOpen = open.includes(c.id) || matched.has(c.pairId);
@@ -95,14 +99,14 @@ function Memory({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
           );
         })}
       </div>
-      <div className="mt-3 text-center text-xs text-ink-500">🟠 turkcha · 🔵 o‘zbekcha · birinchi urinishda topilgan juft +5</div>
+      <div className="mt-3 text-center text-xs text-ink-500">{l({ uz: '🟠 turkcha · 🔵 o‘zbekcha · birinchi urinishda topilgan juft +5', tr: '🟠 Türkçe · 🔵 Özbekçe · ilk denemede bulunan eş +5' })}</div>
     </div>
   );
 }
 
 export default function MemoryPage() {
   return (
-    <GameShell id="memory" title="Xotira kartalari" icon="🃏" desc="Klassik xotira o‘yini — turkcha va o‘zbekcha so‘z juftlarini yopiq kartalar orasidan toping. 3 raund, 24 so‘z." howTo={HOWTO} minWords={8}>
+    <GameShell id="memory" title={{ uz: 'Xotira kartalari', tr: 'Hafıza kartları' }} icon="🃏" desc={{ uz: 'Klassik xotira o‘yini — turkcha va o‘zbekcha so‘z juftlarini yopiq kartalar orasidan toping. 3 raund, 24 so‘z.', tr: 'Klasik hafıza oyunu — Türkçe ve Özbekçe kelime eşlerini kapalı kartlar arasından bulun. 3 tur, 24 kelime.' }} howTo={HOWTO} minWords={8}>
       {(data, onEnd) => <Memory data={data} onEnd={onEnd} />}
     </GameShell>
   );

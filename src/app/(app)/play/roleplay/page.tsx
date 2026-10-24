@@ -5,11 +5,12 @@ import { SpeakButton } from '@/components/exercises/ExerciseViews';
 import type { DialogLine, Lesson } from '@/lib/types';
 import { shuffle, cn } from '@/lib/utils';
 import { speak } from '@/lib/speech';
+import { useLang } from '@/lib/i18n';
 
 const HOWTO = [
-  { icon: '🎭', title: 'Siz — dialog qahramoni', text: 'Suhbatdosh (A) turkcha gapiradi (🔊). Siz B rolida — 3 variantdan suhbatga mos TO‘G‘RI javobni tanlaysiz.' },
-  { icon: '💬', title: 'Kontekst muhim', text: 'Variantlar boshqa dialoglardan olinadi — ma’noga qarang: bozorda narx so‘ralganda "Düz gidin" dema 🙂' },
-  { icon: '🎙️', title: 'Ovoz chiqarib takrorlang', text: 'To‘g‘ri javobdan keyin uni 🔊 eshitib, ovoz chiqarib o‘qing. 3–4 sahna, har to‘g‘ri javob +10, tez javob +5.' },
+  { icon: '🎭', title: { uz: 'Siz — dialog qahramoni', tr: 'Siz — diyalog kahramanı' }, text: { uz: 'Suhbatdosh (A) turkcha gapiradi (🔊). Siz B rolida — 3 variantdan suhbatga mos TO‘G‘RI javobni tanlaysiz.', tr: 'Karşı taraf (A) Türkçe konuşur (🔊). Siz B rolünde — 3 seçenekten sohbete uygun DOĞRU cevabı seçersiniz.' } },
+  { icon: '💬', title: { uz: 'Kontekst muhim', tr: 'Bağlam önemli' }, text: { uz: 'Variantlar boshqa dialoglardan olinadi — ma’noga qarang.', tr: 'Seçenekler başka diyaloglardan alınır — anlama bakın.' } },
+  { icon: '🎙️', title: { uz: 'Ovoz chiqarib takrorlang', tr: 'Sesli tekrarlayın' }, text: { uz: 'To‘g‘ri javobdan keyin 🔊 eshitib, ovoz chiqarib o‘qing. Har to‘g‘ri javob +10, tez javob +5.', tr: 'Doğru cevaptan sonra 🔊 dinleyip sesli okuyun. Her doğru cevap +10, hızlı cevap +5.' } },
 ];
 
 interface Scene { lesson: Lesson; lines: DialogLine[] }
@@ -25,6 +26,7 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
   const [score, setScore] = useState(0);
   const [showUz, setShowUz] = useState(true);
   const st = useRef({ correct: 0, wrong: 0, started: Date.now(), shown: Date.now() });
+  const { l } = useLang();
   const scene = scenes[si];
 
   useEffect(() => {
@@ -41,7 +43,7 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [si, li]);
 
-  if (!scene) return <div className="card p-6 text-center text-ink-300">Dialogli darslar topilmadi. Admin → Kontent → Darslar → content.dialog qo‘shing.</div>;
+  if (!scene) return <div className="card p-6 text-center text-ink-300">{l({ uz: 'Dialogli darslar topilmadi. Admin → Kontent → Darslar → content.dialog qo‘shing.', tr: 'Diyaloglu ders bulunamadı. Yönetici → İçerik → Dersler → content.dialog ekleyin.' })}</div>;
   const correctLine = scene.lines[li + 1];
 
   function choose(o: DialogLine) {
@@ -59,7 +61,7 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
     if (si + 1 >= Math.min(4, scenes.length)) {
       const s = st.current;
       onEnd({ score, correct: s.correct, total: s.correct + s.wrong, xp: Math.min(40, s.correct * 4), durationSec: Math.round((Date.now() - s.started) / 1000), perfect: s.wrong === 0,
-        details: [{ label: 'Sahnalar', value: si + 1 }, { label: 'To‘g‘ri', value: s.correct }, { label: 'Xato', value: s.wrong }] });
+        details: [{ label: { uz: 'Sahnalar', tr: 'Sahneler' }, value: si + 1 }, { label: { uz: 'To‘g‘ri', tr: 'Doğru' }, value: s.correct }, { label: { uz: 'Xato', tr: 'Hata' }, value: s.wrong }] });
       return;
     }
     setHistory([]); setLi(0); setSi(si + 1);
@@ -67,8 +69,8 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
 
   return (
     <div>
-      <Hud score={score} extra={<><span className="card-soft px-3 py-1.5 text-xs text-ink-300">Sahna {si + 1}/{Math.min(4, scenes.length)}</span><button className="card-soft px-3 py-1.5 text-xs text-ink-300" onClick={() => setShowUz(!showUz)}>{showUz ? 'UZ ✓' : 'UZ ✗'}</button></>} />
-      <div className="card-soft mb-3 p-3 text-center text-sm"><span className="text-ink-400">Sahna:</span> <b className="text-white">{scene.lesson.title_uz}</b> <span className="text-ink-400">· {scene.lesson.content.intro?.slice(0, 80)}</span></div>
+      <Hud score={score} extra={<><span className="card-soft px-3 py-1.5 text-xs text-ink-300">{l({ uz: 'Sahna', tr: 'Sahne' })} {si + 1}/{Math.min(4, scenes.length)}</span><button className="card-soft px-3 py-1.5 text-xs text-ink-300" onClick={() => setShowUz(!showUz)}>{showUz ? 'UZ ✓' : 'UZ ✗'}</button></>} />
+      <div className="card-soft mb-3 p-3 text-center text-sm"><span className="text-ink-400">{l({ uz: 'Sahna', tr: 'Sahne' })}:</span> <b className="text-white">{scene.lesson.title_uz}</b> <span className="text-ink-400">· {scene.lesson.content.intro?.slice(0, 80)}</span></div>
       <div className="card max-h-[38vh] space-y-2 overflow-y-auto p-4">
         {history.map((ln, k) => (
           <div key={k} className={cn('flex items-end gap-2', ln.who === 'B' && 'flex-row-reverse')}>
@@ -81,7 +83,7 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
         ))}
       </div>
       <div className="mt-3">
-        <div className="mb-2 text-xs uppercase tracking-wider text-ink-400">Siz nima deysiz? (B)</div>
+        <div className="mb-2 text-xs uppercase tracking-wider text-ink-400">{l({ uz: 'Siz nima deysiz? (B)', tr: 'Siz ne dersiniz? (B)' })}</div>
         <div className="grid gap-2">
           {options.map((o) => (
             <button key={o.tr} type="button" disabled={Boolean(picked)} onClick={() => choose(o)}
@@ -92,8 +94,8 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
         </div>
         {picked && (
           <div className={cn('mt-3 rounded-2xl p-3 text-sm', picked.tr === correctLine.tr ? 'bg-teal-500/15 text-teal-200' : 'bg-rose-500/15 text-rose-200')}>
-            {picked.tr === correctLine.tr ? '✓ To‘g‘ri! Endi ovoz chiqarib takrorlang: ' : '✗ Mos javob: '}<b className="text-white">{correctLine.tr}</b>
-            <button className="btn-teal mt-2 w-full" onClick={next}>Davom etish</button>
+            {picked.tr === correctLine.tr ? l({ uz: '✓ To‘g‘ri! Endi ovoz chiqarib takrorlang: ', tr: '✓ Doğru! Şimdi sesli tekrarlayın: ' }) : l({ uz: '✗ Mos javob: ', tr: '✗ Uygun cevap: ' })}<b className="text-white">{correctLine.tr}</b>
+            <button className="btn-teal mt-2 w-full" onClick={next}>{l({ uz: 'Davom etish', tr: 'Devam et' })}</button>
           </div>
         )}
       </div>
@@ -103,7 +105,7 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
 
 export default function RolePlayPage() {
   return (
-    <GameShell id="roleplay" title="Rol o‘yini" icon="🎭" desc="Haqiqiy vaziyatlar: bozor, shifokor, yo‘l so‘rash… Suhbatdoshga mos javobni tanlang — nutq madaniyati va kontekst." howTo={HOWTO} minWords={0}>
+    <GameShell id="roleplay" title={{ uz: 'Rol o‘yini', tr: 'Rol oyunu' }} icon="🎭" desc={{ uz: 'Haqiqiy vaziyatlar: bozor, shifokor, yo‘l so‘rash… Suhbatdoshga mos javobni tanlang — nutq madaniyati va kontekst.', tr: 'Gerçek durumlar: pazar, doktor, yol sorma… Karşı tarafa uygun cevabı seçin — konuşma kültürü ve bağlam.' }} howTo={HOWTO} minWords={0}>
       {(data, onEnd) => <RolePlay data={data} onEnd={onEnd} />}
     </GameShell>
   );

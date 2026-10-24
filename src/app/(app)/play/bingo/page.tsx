@@ -6,11 +6,12 @@ import { SrsSession } from '@/lib/srs-client';
 import type { Word } from '@/lib/types';
 import { shuffle, cn } from '@/lib/utils';
 import { speak, ttsAvailable } from '@/lib/speech';
+import { useLang } from '@/lib/i18n';
 
 const HOWTO = [
-  { icon: '🎱', title: '4×4 karta', text: 'Kartada 16 ta turkcha so‘z. Yuqorida navbat bilan chaqiruv chiqadi: o‘zbekcha ma’no yoki faqat 🔊 ovoz.' },
-  { icon: '⏱️', title: 'Vaqt chizig‘i', text: 'Har chaqiruvga ~6 soniya. Kartadan mos so‘zni bosing. To‘g‘ri = +10, xato = −5 va katak qizaradi.' },
-  { icon: '🏁', title: 'BINGO!', text: 'To‘liq qator, ustun yoki diagonal = BINGO (+25). 2 ta BINGO yoki hamma chaqiruvlar tugashi bilan o‘yin yakunlanadi.' },
+  { icon: '🎱', title: { uz: '4×4 karta', tr: '4×4 kart' }, text: { uz: 'Kartada 16 ta turkcha so‘z. Yuqorida navbat bilan chaqiruv: o‘zbekcha ma’no yoki faqat 🔊 ovoz.', tr: 'Kartta 16 Türkçe kelime. Üstte sırayla çağrı: Özbekçe anlam ya da sadece 🔊 ses.' } },
+  { icon: '⏱️', title: { uz: 'Vaqt chizig‘i', tr: 'Süre çizgisi' }, text: { uz: 'Har chaqiruvga ~6 soniya. Mos so‘zni bosing. To‘g‘ri = +10, xato = −5.', tr: 'Her çağrıya ~6 saniye. Uygun kelimeye basın. Doğru = +10, hata = −5.' } },
+  { icon: '🏁', title: { uz: 'BINGO!', tr: 'BINGO!' }, text: { uz: 'Qator, ustun yoki diagonal = BINGO (+25). 2 ta BINGO yoki chaqiruvlar tugashi bilan o‘yin yakunlanadi.', tr: 'Satır, sütun ya da köşegen = BINGO (+25). 2 BINGO ya da çağrılar bitince oyun biter.' } },
 ];
 
 const LINES = [[0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15],[0,4,8,12],[1,5,9,13],[2,6,10,14],[3,7,11,15],[0,5,10,15],[3,6,9,12]];
@@ -32,6 +33,7 @@ function Bingo({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void
   const srs = useMemo(() => new SrsSession('bingo'), []);
   const CALL_MS = 6500;
   const tts = ttsAvailable();
+  const { l } = useLang();
 
   useEffect(() => { srs.load(); }, [srs]);
 
@@ -42,7 +44,7 @@ function Bingo({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void
     st.current.ended = true;
     const s = st.current;
     onEnd({ score: s.score + extraScore, correct: s.correct, total: s.correct + s.wrong, xp: Math.min(45, s.correct * 2 + bingos.length * 5), durationSec: Math.round((Date.now() - started.current) / 1000), perfect: s.wrong === 0 && s.correct >= 12,
-      details: [{ label: 'BINGO', value: bingos.length }, { label: 'To‘g‘ri', value: s.correct }, { label: 'Xato', value: s.wrong }], mistakes: s.mistakes });
+      details: [{ label: 'BINGO', value: bingos.length }, { label: { uz: 'To‘g‘ri', tr: 'Doğru' }, value: s.correct }, { label: { uz: 'Xato', tr: 'Hata' }, value: s.wrong }], mistakes: s.mistakes });
   }, [onEnd, bingos.length]);
 
   const nextCall = useCallback(() => {
@@ -100,9 +102,9 @@ function Bingo({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void
   if (!target) return null;
   return (
     <div>
-      <Hud score={score} extra={<><span className="card-soft px-3 py-1.5 text-xs text-ink-300">Chaqiruv {Math.min(callIdx + 1, order.length)}/{order.length}</span><span className="card-soft px-3 py-1.5 text-xs text-gold-300">BINGO {bingos.length}/2</span></>} />
+      <Hud score={score} extra={<><span className="card-soft px-3 py-1.5 text-xs text-ink-300">{l({ uz: 'Chaqiruv', tr: 'Çağrı' })} {Math.min(callIdx + 1, order.length)}/{order.length}</span><span className="card-soft px-3 py-1.5 text-xs text-gold-300">BINGO {bingos.length}/2</span></>} />
       <div className="card-soft p-4 text-center">
-        <div className="text-[10px] uppercase tracking-wider text-ink-400">{audioOnly ? 'Faqat eshiting 🎧' : 'Qidiring'}</div>
+        <div className="text-[10px] uppercase tracking-wider text-ink-400">{audioOnly ? l({ uz: 'Faqat eshiting 🎧', tr: 'Sadece dinleyin 🎧' }) : l({ uz: 'Qidiring', tr: 'Bulun' })}</div>
         <div className="mt-1 flex items-center justify-center gap-3">
           {!audioOnly && <div className="font-display text-2xl font-bold text-ember-300">{target.uz}</div>}
           <SpeakButton text={target.tr} size={audioOnly ? 'lg' : 'sm'} />
@@ -126,7 +128,7 @@ function Bingo({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void
 
 export default function BingoPage() {
   return (
-    <GameShell id="bingo" title="Bingo" icon="🎱" desc="Tinglash + tez qidirish: chaqiruvga mos so‘zni 4×4 kartadan toping, qatorlarni yoping — BINGO!" howTo={HOWTO} minWords={16}>
+    <GameShell id="bingo" title={{ uz: 'Bingo', tr: 'Bingo' }} icon="🎱" desc={{ uz: 'Tinglash + tez qidirish: chaqiruvga mos so‘zni 4×4 kartadan toping, qatorlarni yoping — BINGO!', tr: 'Dinleme + hızlı arama: çağrıya uygun kelimeyi 4×4 kartta bulun, satırları kapatın — BINGO!' }} howTo={HOWTO} minWords={16}>
       {(data, onEnd) => <Bingo data={data} onEnd={onEnd} />}
     </GameShell>
   );

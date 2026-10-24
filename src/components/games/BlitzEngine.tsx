@@ -3,10 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChoiceExercise, Word } from '@/lib/types';
 import { shuffle } from '@/lib/utils';
 import { normalizeTr } from '@/lib/turkish';
-import { SpeakButton } from '@/components/exercises/ExerciseViews';
+import { SpeakButton, useSub } from '@/components/exercises/ExerciseViews';
 import { Hud, useCountdown, type GameResult } from './GameShell';
 import { SrsSession } from '@/lib/srs-client';
 import { cn } from '@/lib/utils';
+import { useLang } from '@/lib/i18n';
 
 /** Seed bilan bir xil savollar — kunlik chaqiriq va do'st chaqirig'i uchun */
 export function buildBlitzQuestions(words: Word[], n: number, seed?: number): ChoiceExercise[] {
@@ -34,6 +35,8 @@ export function buildBlitzQuestions(words: Word[], n: number, seed?: number): Ch
 interface Props { questions: ChoiceExercise[]; seconds?: number; onEnd: (r: GameResult) => void; mode?: string; allWords?: Word[] }
 
 export default function BlitzEngine({ questions, seconds = 60, onEnd, mode = 'blitz', allWords = [] }: Props) {
+  const { l } = useLang();
+  const sub = useSub();
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -58,7 +61,7 @@ export default function BlitzEngine({ questions, seconds = 60, onEnd, mode = 'bl
     setRunning(false);
     const s = stats.current;
     onEnd({ score: s.score, correct: s.correct, total: s.answered, xp: Math.min(60, Math.round(s.correct * 2 + s.maxCombo)), durationSec: Math.round((Date.now() - started.current) / 1000), perfect: s.answered >= 10 && s.correct === s.answered,
-      details: [{ label: 'Javoblar', value: s.answered }, { label: 'Eng uzun combo', value: s.maxCombo }, { label: 'Aniqlik', value: s.answered ? Math.round((s.correct / s.answered) * 100) + '%' : '—' }],
+      details: [{ label: { uz: 'Javoblar', tr: 'Cevaplar' }, value: s.answered }, { label: { uz: 'Eng uzun combo', tr: 'En uzun kombo' }, value: s.maxCombo }, { label: { uz: 'Aniqlik', tr: 'Doğruluk' }, value: s.answered ? Math.round((s.correct / s.answered) * 100) + '%' : '—' }],
       mistakes: mistakes.current });
   }, [onEnd]);
 
@@ -79,14 +82,14 @@ export default function BlitzEngine({ questions, seconds = 60, onEnd, mode = 'bl
       const gained = 10 + speedBonus + (c >= 3 ? 5 : 0);
       st.score += gained; st.correct += 1; st.maxCombo = Math.max(st.maxCombo, c);
       setScore(st.score); setCorrect(st.correct); setCombo(c); setMaxCombo(st.maxCombo);
-      if (c > 0 && c % 5 === 0) { setTime((t) => t + 3); setBonusMsg('+3 soniya! 🔥'); setTimeout(() => setBonusMsg(null), 900); }
+      if (c > 0 && c % 5 === 0) { setTime((t) => t + 3); setBonusMsg(l({ uz: '+3 soniya! 🔥', tr: '+3 saniye! 🔥' })); setTimeout(() => setBonusMsg(null), 900); }
     } else {
       setCombo(0);
       const w = allWords.find((x) => x.id === q.wordId);
       if (w) mistakes.current.push({ tr: w.tr, uz: w.uz });
     }
     setTimeout(() => { setPicked(null); setFlash(null); setIdx((x) => x + 1); shownAt.current = Date.now(); }, ok ? 280 : 650);
-  }, [picked, running, q, combo, srs, allWords, setTime]);
+  }, [picked, running, q, combo, srs, allWords, setTime, l]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { const n = Number(e.key); if (n >= 1 && n <= 4) answer(n - 1); };
@@ -101,7 +104,7 @@ export default function BlitzEngine({ questions, seconds = 60, onEnd, mode = 'bl
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-ember-500 transition-all duration-1000 ease-linear" style={{ width: `${(time / Math.max(seconds, 1)) * 100}%` }} /></div>
       {bonusMsg && <div className="absolute right-2 top-14 animate-pop rounded-full bg-gold-400/20 px-3 py-1 text-sm font-bold text-gold-300">{bonusMsg}</div>}
       <div key={idx} className="mt-6 animate-pop text-center">
-        <div className="text-xs uppercase tracking-wider text-ink-400">{q.promptSub}</div>
+        <div className="text-xs uppercase tracking-wider text-ink-400">{sub(q.promptSub)}</div>
         <div className="mt-1 flex items-center justify-center gap-3"><div className="font-display text-4xl font-bold text-white">{q.prompt}</div>{q.tts && <SpeakButton text={q.tts} size="sm" />}</div>
       </div>
       <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -112,7 +115,7 @@ export default function BlitzEngine({ questions, seconds = 60, onEnd, mode = 'bl
           </button>
         ))}
       </div>
-      <div className="mt-4 text-center text-xs text-ink-500">Tez javob = ko‘proq ball · har 5 ketma-ket to‘g‘ri = +3 soniya · {maxCombo > 0 ? `eng uzun combo ${maxCombo}` : 'combo yig‘ing'}</div>
+      <div className="mt-4 text-center text-xs text-ink-500">{l({ uz: `Tez javob = ko‘proq ball · har 5 ketma-ket to‘g‘ri = +3 soniya · ${maxCombo > 0 ? `eng uzun combo ${maxCombo}` : 'combo yig‘ing'}`, tr: `Hızlı cevap = daha çok puan · art arda 5 doğru = +3 saniye · ${maxCombo > 0 ? `en uzun kombo ${maxCombo}` : 'kombo toplayın'}` })}</div>
     </div>
   );
 }

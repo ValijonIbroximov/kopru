@@ -11,7 +11,8 @@ import { buildDuelQuestions } from '@/lib/exercises';
 import type { ChoiceExercise, Duel } from '@/lib/types';
 import { PageHeader, Empty } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import { SpeakButton } from '@/components/exercises/ExerciseViews';
+import { SpeakButton, useSub } from '@/components/exercises/ExerciseViews';
+import { useLang } from '@/lib/i18n';
 
 type Phase = 'lobby' | 'waiting' | 'playing' | 'done';
 interface Peer { id: string; name: string; avatar: string; score: number; index: number; done: boolean }
@@ -21,6 +22,8 @@ function genCode() { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return Array.
 export default function DuelPage() {
   const { profile, settings } = useProfile();
   const { push } = useToast();
+  const { l, t } = useLang();
+  const sub = useSub();
   const [phase, setPhase] = useState<Phase>('lobby');
   const [duel, setDuel] = useState<Duel | null>(null);
   const [code, setCode] = useState('');
@@ -35,14 +38,23 @@ export default function DuelPage() {
   const peerRef = useRef<Peer | null>(null);
   const finalized = useRef(false);
 
+  const rowChan = useRef<RealtimeChannel | null>(null);
+  const busyRef = useRef(false);
+
   useEffect(() => {
     const c = new URLSearchParams(window.location.search).get('code');
     if (c) setCode(c.toUpperCase());
-    return () => { chan.current?.unsubscribe(); };
+    return () => {
+      const sb = supabaseBrowser();
+      if (chan.current) sb.removeChannel(chan.current).catch(() => {});
+      if (rowChan.current) sb.removeChannel(rowChan.current).catch(() => {});
+    };
   }, []);
 
   const subscribe = useCallback((d: Duel, self: Peer) => {
     const sb = supabaseBrowser();
+    if (chan.current) { sb.removeChannel(chan.current).catch(() => {}); chan.current = null; }
+    // presence topic ikkala o'yinchida bir xil bo'lishi shart (duel kodi); bitta sahifada faqat bir marta ochiladi
     const ch = sb.channel(`duel:${d.code}`, { config: { presence: { key: self.id }, broadcast: { self: false } } });
     ch.on('presence', { event: 'sync' }, () => {
       const st = ch.presenceState<Peer>();
@@ -63,33 +75,40 @@ export default function DuelPage() {
   }, []);
 
   async function createDuel() {
-    if (!profile) return;
+    if (!profile || busyRef.current) return;
+    busyRef.current = true;
     setErr(null);
-    const [all, lp, lessons] = await Promise.all([fetchWords(), fetchLessonProgress(), fetchLessons()]);
-    const qs = buildDuelQuestions(knownWords(all, lessons, lp, 30), 10);
-    const c = genCode();
-    const { data, error } = await supabaseBrowser().from('duels').insert({ code: c, host_id: profile.id, questions: qs }).select('*').maybeSingle();
-    if (error || !data) { setErr(error?.message ?? 'Xato'); return; }
-    const self: Peer = { id: profile.id, name: profile.display_name ?? profile.username, avatar: profile.avatar, score: 0, index: 0, done: false };
-    meRef.current = self; setMe(self);
-    setDuel(data as Duel); setPhase('waiting');
-    subscribe(data as Duel, self);
-    // mehmon qo'shilganini kuzatish
-    supabaseBrowser().channel(`duel-row:${c}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `code=eq.${c}` }, (p) => {
-      const row = p.new as Duel;
-      if (row.guest_id && row.status === 'playing') { setDuel(row); setPhase('playing'); shownAt.current = Date.now(); chan.current?.send({ type: 'broadcast', event: 'start', payload: {} }); }
-    }).subscribe();
+    try {
+      const [all, lp, lessons] = await Promise.all([fetchWords(), fetchLessonProgress(), fetchLessons()]);
+      const qs = buildDuelQuestions(knownWords(all, lessons, lp, 30), 10);
+      const c = genCode();
+      const { data, error } = await supabaseBrowser().from('duels').insert({ code: c, host_id: profile.id, questions: qs }).select('*').maybeSingle();
+      if (error || !data) { setErr(error?.message ?? t('error')); return; }
+      const self: Peer = { id: profile.id, name: profile.display_name ?? profile.username, avatar: profile.avatar, score: 0, index: 0, done: false };
+      meRef.current = self; setMe(self);
+      setDuel(data as Duel); setPhase('waiting');
+      subscribe(data as Duel, self);
+      // mehmon qo'shilganini kuzatish (noyob topic — takroriy obuna xatosiz)
+      const sb = supabaseBrowser();
+      if (rowChan.current) sb.removeChannel(rowChan.current).catch(() => {});
+      rowChan.current = sb.channel(`duel-row:${c}:${Math.random().toString(36).slice(2, 7)}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `code=eq.${c}` }, (p) => {
+        const row = p.new as Duel;
+        if (row.guest_id && row.status === 'playing') { setDuel(row); setPhase('playing'); shownAt.current = Date.now(); chan.current?.send({ type: 'broadcast', event: 'start', payload: {} }); }
+      }).subscribe();
+    } catch (e) { setErr(String((e as Error).message)); } finally { busyRef.current = false; }
   }
 
   async function joinDuel() {
-    if (!profile) return;
+    if (!profile || busyRef.current) return;
+    busyRef.current = true;
+    setTimeout(() => { busyRef.current = false; }, 1500);
     setErr(null);
     const c = code.trim().toUpperCase();
     const { data } = await supabaseBrowser().from('duels').select('*').eq('code', c).eq('status', 'waiting').maybeSingle();
-    if (!data) { setErr('Bunday kod topilmadi yoki duel allaqachon boshlangan.'); return; }
-    if (data.host_id === profile.id) { setErr('O‘zingiz bilan duel qila olmaysiz 🙂'); return; }
+    if (!data) { setErr(l({ uz: 'Bunday kod topilmadi yoki duel allaqachon boshlangan.', tr: 'Böyle bir kod bulunamadı ya da düello zaten başladı.' })); return; }
+    if (data.host_id === profile.id) { setErr(l({ uz: 'O‘zingiz bilan duel qila olmaysiz 🙂', tr: 'Kendinizle düello yapamazsınız 🙂' })); return; }
     const { data: upd, error } = await supabaseBrowser().from('duels').update({ guest_id: profile.id, status: 'playing', updated_at: new Date().toISOString() }).eq('id', data.id).select('*').maybeSingle();
-    if (error || !upd) { setErr(error?.message ?? 'Qo‘shilib bo‘lmadi'); return; }
+    if (error || !upd) { setErr(error?.message ?? l({ uz: 'Qo‘shilib bo‘lmadi', tr: 'Katılma başarısız oldu' })); return; }
     const self: Peer = { id: profile.id, name: profile.display_name ?? profile.username, avatar: profile.avatar, score: 0, index: 0, done: false };
     meRef.current = self; setMe(self);
     setDuel(upd as Duel);
@@ -132,27 +151,27 @@ export default function DuelPage() {
       const xp = tie ? Math.round((settings.xp.duel_win + settings.xp.duel_lose) / 2) : win ? settings.xp.duel_win : settings.xp.duel_lose;
       await finishSession(null, 'duel', 3, false);
       await addXp(xp, 'duel', { win, tie });
-      push({ kind: 'xp', icon: win ? '🏆' : tie ? '🤝' : '⚔️', title: `+${xp} XP`, body: win ? 'G‘alaba!' : tie ? 'Durang' : 'Keyingi safar!' });
+      push({ kind: 'xp', icon: win ? '🏆' : tie ? '🤝' : '⚔️', title: `+${xp} XP`, body: win ? l({ uz: 'G‘alaba!', tr: 'Kazandınız!' }) : tie ? l({ uz: 'Durang', tr: 'Berabere' }) : l({ uz: 'Keyingi safar!', tr: 'Bir dahaki sefere!' }) });
       const ach = await checkAchievements();
-      for (const a of ach) push({ kind: 'achievement', icon: a.icon, title: `Yutuq: ${a.title}`, body: `+${a.xp} XP` });
+      for (const a of ach) push({ kind: 'achievement', icon: a.icon, title: `${l({ uz: 'Yutuq', tr: 'Başarı' })}: ${a.title}`, body: `+${a.xp} XP` });
     }, bothDone ? 300 : 20000); // raqib 20 soniyada tugatmasa ham yakunlaymiz
     return () => clearTimeout(timer);
-  }, [phase, peer, duel, me, settings, push]);
+  }, [phase, peer, duel, me, settings, push, l]);
 
-  if (isLocal()) return <Empty icon="⚔️" title="Duel Supabase talab qiladi" body="Demo rejimda real vaqt o‘yini ishlamaydi. README.md bo‘yicha Supabase ulang." action={<Link href="/play" className="btn-secondary">Orqaga</Link>} />;
-  if (settings.features.duel === false) return <Empty icon="🔒" title="Duel o‘chirilgan" body="Admin bu rejimni vaqtincha o‘chirgan." />;
+  if (isLocal()) return <Empty icon="⚔️" title={l({ uz: 'Duel Supabase talab qiladi', tr: 'Düello Supabase gerektirir' })} body={l({ uz: 'Demo rejimda real vaqt o‘yini ishlamaydi. README.md bo‘yicha Supabase ulang.', tr: 'Demo modunda gerçek zamanlı oyun çalışmaz. README.md dosyasına göre Supabase bağlayın.' })} action={<Link href="/play" className="btn-secondary">{t('back')}</Link>} />;
+  if (settings.features.duel === false) return <Empty icon="🔒" title={l({ uz: 'Duel o‘chirilgan', tr: 'Düello kapalı' })} body={l({ uz: 'Admin bu rejimni vaqtincha o‘chirgan.', tr: 'Yönetici bu modu geçici olarak kapattı.' })} />;
 
   if (phase === 'lobby') {
     return (
       <div className="mx-auto max-w-xl">
-        <PageHeader title="⚔️ Duel" sub="Do‘stingiz bilan bir xil 10 ta savol, real vaqtda. Tezlik ham ball beradi." />
+        <PageHeader title={l({ uz: '⚔️ Duel', tr: '⚔️ Düello' })} sub={l({ uz: 'Do‘stingiz bilan bir xil 10 ta savol, real vaqtda. Tezlik ham ball beradi.', tr: 'Arkadaşınızla aynı 10 soru, gerçek zamanlı. Hız da puan kazandırır.' })} />
         <div className="grid gap-3">
           <button className="card p-5 text-left hover:border-ember-400/40" onClick={createDuel}>
-            <div className="text-2xl">🎯</div><div className="mt-1 font-display text-lg font-bold">Duel yaratish</div><div className="text-sm text-ink-300">Kod olasiz — do‘stingizga yuboring.</div>
+            <div className="text-2xl">🎯</div><div className="mt-1 font-display text-lg font-bold">{l({ uz: 'Duel yaratish', tr: 'Düello oluştur' })}</div><div className="text-sm text-ink-300">{l({ uz: 'Kod olasiz — do‘stingizga yuboring.', tr: 'Bir kod alırsınız — arkadaşınıza gönderin.' })}</div>
           </button>
           <div className="card p-5">
-            <div className="text-2xl">🔑</div><div className="mt-1 font-display text-lg font-bold">Kod bilan qo‘shilish</div>
-            <div className="mt-2 flex gap-2"><input className="input uppercase tracking-widest" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} placeholder="ABC123" /><button className="btn-primary" onClick={joinDuel} disabled={code.length < 6}>Kirish</button></div>
+            <div className="text-2xl">🔑</div><div className="mt-1 font-display text-lg font-bold">{l({ uz: 'Kod bilan qo‘shilish', tr: 'Kodla katıl' })}</div>
+            <div className="mt-2 flex gap-2"><input className="input uppercase tracking-widest" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} placeholder="ABC123" /><button className="btn-primary" onClick={joinDuel} disabled={code.length < 6}>{l({ uz: 'Kirish', tr: 'Katıl' })}</button></div>
           </div>
           {err && <div className="rounded-2xl bg-rose-500/15 p-3 text-sm text-rose-200">{err}</div>}
         </div>
@@ -164,11 +183,11 @@ export default function DuelPage() {
     return (
       <div className="mx-auto max-w-xl">
         <div className="card p-6 text-center">
-          <div className="text-xs uppercase tracking-wider text-ink-400">Duel kodi</div>
+          <div className="text-xs uppercase tracking-wider text-ink-400">{l({ uz: 'Duel kodi', tr: 'Düello kodu' })}</div>
           <div className="my-3 font-display text-5xl font-extrabold tracking-[0.3em] text-ember-400">{duel.code}</div>
-          <button className="btn-secondary" onClick={() => { navigator.clipboard?.writeText(`${location.origin}/play/duel?code=${duel.code}`); push({ kind: 'success', title: 'Havola nusxalandi' }); }}>Havolani nusxalash</button>
-          <div className="mt-6 animate-pulse text-sm text-ink-300">{peer ? `${peer.avatar} ${peer.name} ulandi — boshlanmoqda…` : 'Raqib kutilmoqda…'}</div>
-          <Link href="/play" className="btn-ghost mt-4">Bekor qilish</Link>
+          <button className="btn-secondary" onClick={() => { navigator.clipboard?.writeText(`${location.origin}/play/duel?code=${duel.code}`); push({ kind: 'success', title: t('link_copied') }); }}>{t('copy_link')}</button>
+          <div className="mt-6 animate-pulse text-sm text-ink-300">{peer ? l({ uz: `${peer.avatar} ${peer.name} ulandi — boshlanmoqda…`, tr: `${peer.avatar} ${peer.name} bağlandı — başlıyor…` }) : l({ uz: 'Raqib kutilmoqda…', tr: 'Rakip bekleniyor…' })}</div>
+          <Link href="/play" className="btn-ghost mt-4">{l({ uz: 'Bekor qilish', tr: 'İptal' })}</Link>
         </div>
       </div>
     );
@@ -178,11 +197,11 @@ export default function DuelPage() {
     return (
       <div className="mx-auto max-w-xl">
         <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-          <div className="card-soft p-3"><div className="truncate">{me.avatar} {me.name} (siz)</div><div className="font-display text-2xl font-bold text-ember-400">{me.score}</div><div className="text-xs text-ink-400">{me.index}/{questions.length}</div></div>
+          <div className="card-soft p-3"><div className="truncate">{me.avatar} {me.name} ({t('you')})</div><div className="font-display text-2xl font-bold text-ember-400">{me.score}</div><div className="text-xs text-ink-400">{me.index}/{questions.length}</div></div>
           <div className="card-soft p-3 text-right"><div className="truncate">{peer ? `${peer.avatar} ${peer.name}` : '…'}</div><div className="font-display text-2xl font-bold text-teal-400">{peer?.score ?? 0}</div><div className="text-xs text-ink-400">{peer?.index ?? 0}/{questions.length}</div></div>
         </div>
         <div className="card p-5">
-          <div className="text-xs text-ink-400">{idx + 1}/{questions.length} · {q.promptSub}</div>
+          <div className="text-xs text-ink-400">{idx + 1}/{questions.length} · {sub(q.promptSub)}</div>
           <div className="my-3 flex items-center gap-3"><div className="font-display text-3xl font-bold">{q.prompt}</div>{q.tts && <SpeakButton text={q.tts} size="sm" />}</div>
           <div className="grid gap-2">
             {q.options.map((o, i) => (
@@ -201,9 +220,9 @@ export default function DuelPage() {
       <div className="mx-auto max-w-xl">
         <div className="card p-6 text-center">
           <div className="text-5xl">{win ? '🏆' : tie ? '🤝' : '⚔️'}</div>
-          <h2 className="title mt-2">{win ? 'G‘alaba!' : tie ? 'Durang!' : 'Keyingi safar yutasiz'}</h2>
-          <div className="mt-4 flex justify-center gap-8"><div><div className="font-display text-4xl font-bold text-ember-400">{me.score}</div><div className="text-xs text-ink-400">siz</div></div><div><div className="font-display text-4xl font-bold text-teal-400">{ps}</div><div className="text-xs text-ink-400">{peer?.name ?? 'raqib'}{peer && !peer.done ? ' (hali tugatmadi)' : ''}</div></div></div>
-          <div className="mt-6 grid gap-2"><button className="btn-primary" onClick={() => { chan.current?.unsubscribe(); finalized.current = false; peerRef.current = null; setPeer(null); setIdx(0); setPhase('lobby'); }}>Yana duel</button><Link href="/play" className="btn-secondary">O‘yinlar</Link></div>
+          <h2 className="title mt-2">{win ? l({ uz: 'G‘alaba!', tr: 'Kazandınız!' }) : tie ? l({ uz: 'Durang!', tr: 'Berabere!' }) : l({ uz: 'Keyingi safar yutasiz', tr: 'Bir dahaki sefere kazanırsınız' })}</h2>
+          <div className="mt-4 flex justify-center gap-8"><div><div className="font-display text-4xl font-bold text-ember-400">{me.score}</div><div className="text-xs text-ink-400">{t('you')}</div></div><div><div className="font-display text-4xl font-bold text-teal-400">{ps}</div><div className="text-xs text-ink-400">{peer?.name ?? l({ uz: 'raqib', tr: 'rakip' })}{peer && !peer.done ? ` (${l({ uz: 'hali tugatmadi', tr: 'henüz bitirmedi' })})` : ''}</div></div></div>
+          <div className="mt-6 grid gap-2"><button className="btn-primary" onClick={() => { const sb = supabaseBrowser(); if (chan.current) { sb.removeChannel(chan.current).catch(() => {}); chan.current = null; } if (rowChan.current) { sb.removeChannel(rowChan.current).catch(() => {}); rowChan.current = null; } finalized.current = false; peerRef.current = null; setPeer(null); setIdx(0); setPhase('lobby'); }}>{l({ uz: 'Yana duel', tr: 'Yeniden düello' })}</button><Link href="/play" className="btn-secondary">{t('games')}</Link></div>
         </div>
       </div>
     );

@@ -1,7 +1,7 @@
 {
-  "name": "Köprü — Turk tili akademiyasi",
-  "short_name": "Köprü",
-  "description": "O'zbeklar uchun o'yinli, sun'iy intellektli turk tili o'rganish platformasi",
+  "name": "TezBil — Turk tili akademiyasi",
+  "short_name": "TezBil",
+  "description": "O'zbeklar uchun o'yinli, sun'iy intellektli turk tili o'rganish platformasi. © Valijon Ibroximov",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#07090f",

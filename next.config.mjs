@@ -2,6 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
+  // Edge TTS websocket (ws) — bundle qilinmasin, runtime'da require bo'lsin
+  serverExternalPackages: ['ws'],
   experimental: {
     serverActions: { bodySizeLimit: '2mb' },
   },

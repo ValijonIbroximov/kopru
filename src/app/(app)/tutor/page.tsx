@@ -9,24 +9,27 @@ import { TurkishKeys, SpeakButton } from '@/components/exercises/ExerciseViews';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import type { AiFailure } from '@/lib/types';
+import { useLang } from '@/lib/i18n';
 
 interface TutorReply { reply_tr: string; reply_uz: string; corrections?: { wrong: string; right: string; why: string }[]; new_words?: { tr: string; uz: string }[]; praise?: string }
 interface Msg { role: 'user' | 'assistant'; content: string; data?: TutorReply }
 
+// s — AI promptiga boradigan ssenariy (o'zbekcha qoladi, prompt o'zbekcha); t — UI nomi ikki tilda
 const SCENARIOS = [
-  { id: 'tanishuv', t: '👋 Tanishuv', s: 'Yangi tanishuv: ism, qayerdan, kasb' },
-  { id: 'kafe', t: '☕ Kafeda', s: 'Kafeda buyurtma berish' },
-  { id: 'bozor', t: '🍉 Bozorda', s: 'Bozorda narx so‘rash va savdolashish' },
-  { id: 'yol', t: '🗺️ Yo‘l so‘rash', s: 'Shaharda yo‘l so‘rash' },
-  { id: 'shifokor', t: '🏥 Shifokorda', s: 'Shifokorga shikoyat aytish' },
-  { id: 'ish', t: '💼 Ish suhbati', s: 'Oddiy ish suhbati (A2)' },
-  { id: 'erkin', t: '💬 Erkin suhbat', s: 'erkin suhbat' },
+  { id: 'tanishuv', t: { uz: '👋 Tanishuv', tr: '👋 Tanışma' }, s: 'Yangi tanishuv: ism, qayerdan, kasb', sl: { uz: 'Yangi tanishuv: ism, qayerdan, kasb', tr: 'Yeni tanışma: isim, nereli, meslek' } },
+  { id: 'kafe', t: { uz: '☕ Kafeda', tr: '☕ Kafede' }, s: 'Kafeda buyurtma berish', sl: { uz: 'Kafeda buyurtma berish', tr: 'Kafede sipariş verme' } },
+  { id: 'bozor', t: { uz: '🍉 Bozorda', tr: '🍉 Pazarda' }, s: 'Bozorda narx so‘rash va savdolashish', sl: { uz: 'Bozorda narx so‘rash va savdolashish', tr: 'Pazarda fiyat sorma ve pazarlık' } },
+  { id: 'yol', t: { uz: '🗺️ Yo‘l so‘rash', tr: '🗺️ Yol sorma' }, s: 'Shaharda yo‘l so‘rash', sl: { uz: 'Shaharda yo‘l so‘rash', tr: 'Şehirde yol sorma' } },
+  { id: 'shifokor', t: { uz: '🏥 Shifokorda', tr: '🏥 Doktorda' }, s: 'Shifokorga shikoyat aytish', sl: { uz: 'Shifokorga shikoyat aytish', tr: 'Doktora şikâyet anlatma' } },
+  { id: 'ish', t: { uz: '💼 Ish suhbati', tr: '💼 İş görüşmesi' }, s: 'Oddiy ish suhbati (A2)', sl: { uz: 'Oddiy ish suhbati (A2)', tr: 'Basit iş görüşmesi (A2)' } },
+  { id: 'erkin', t: { uz: '💬 Erkin suhbat', tr: '💬 Serbest sohbet' }, s: 'erkin suhbat', sl: { uz: 'erkin suhbat', tr: 'serbest sohbet' } },
 ];
 const KEY = 'kopru.tutor.v1';
 
 export default function TutorPage() {
   const { profile, settings } = useProfile();
   const { push } = useToast();
+  const { l, t } = useLang();
   const [scenario, setScenario] = useState(SCENARIOS[0]);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -41,10 +44,10 @@ export default function TutorPage() {
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify({ msgs: msgs.slice(-24), turns, scenario: scenario.id })); } catch { /* noop */ } bottom.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs, turns, scenario]);
 
   async function send(text?: string) {
-    const t = (text ?? input).trim();
-    if (!t || busy) return;
+    const body = (text ?? input).trim();
+    if (!body || busy) return;
     setInput(''); setFail(null);
-    const next: Msg[] = [...msgs, { role: 'user', content: t }];
+    const next: Msg[] = [...msgs, { role: 'user', content: body }];
     setMsgs(next); setBusy(true);
     const res = await callAi<TutorReply>('tutor', { level: profile?.level_cefr ?? 'A1', scenario: scenario.s, messages: next.map((m) => ({ role: m.role, content: m.content })) });
     setBusy(false);
@@ -54,7 +57,7 @@ export default function TutorPage() {
       if (nt <= settings.ai.tutor_max_turns) {
         await finishSession(null, 'tutor', 1, false);
         const r = await addXp(settings.xp.tutor_turn ?? 3, 'tutor');
-        if (r?.leveled_up) push({ kind: 'xp', icon: '🆙', title: `${r.level}-daraja!` });
+        if (r?.leveled_up) push({ kind: 'xp', icon: '🆙', title: l({ uz: `${r.level}-daraja!`, tr: `${r.level}. seviye!` }) });
       }
     } else setFail(res);
   }
@@ -63,18 +66,18 @@ export default function TutorPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col" style={{ minHeight: 'calc(100vh - 9rem)' }}>
-      <PageHeader title="🤖 AI o‘qituvchi" sub={`Turkcha yozing (xato bo‘lsa ham!). Tuzatadi, tarjima qiladi, savol beradi. Har xabar +${settings.xp.tutor_turn} XP (kuniga ${settings.ai.tutor_max_turns} tagacha).`}
-        right={<button className="chip" onClick={() => setShowUz(!showUz)}>{showUz ? 'UZ: yoqilgan' : 'UZ: o‘chiq'}</button>} />
+      <PageHeader title={`🤖 ${t('tutor')}`} sub={l({ uz: `Turkcha yozing (xato bo‘lsa ham!). Tuzatadi, tarjima qiladi, savol beradi. Har xabar +${settings.xp.tutor_turn} XP (kuniga ${settings.ai.tutor_max_turns} tagacha).`, tr: `Türkçe yazın (hatalı olsa da!). Düzeltir, çevirir, soru sorar. Her mesaj +${settings.xp.tutor_turn} XP (günde en fazla ${settings.ai.tutor_max_turns}).` })}
+        right={<button className="chip" onClick={() => setShowUz(!showUz)}>{showUz ? l({ uz: 'UZ: yoqilgan', tr: 'UZ: açık' }) : l({ uz: 'UZ: o‘chiq', tr: 'UZ: kapalı' })}</button>} />
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {SCENARIOS.map((s) => <button key={s.id} onClick={() => { setScenario(s); setMsgs([]); }} className={cn('chip shrink-0 py-1.5 text-sm', scenario.id === s.id && 'border-fuchsia-400 bg-fuchsia-500/20 text-white')}>{s.t}</button>)}
+        {SCENARIOS.map((s) => <button key={s.id} onClick={() => { setScenario(s); setMsgs([]); }} className={cn('chip shrink-0 py-1.5 text-sm', scenario.id === s.id && 'border-fuchsia-400 bg-fuchsia-500/20 text-white')}>{l(s.t)}</button>)}
       </div>
 
       <div className="card flex-1 space-y-3 overflow-y-auto p-4">
         {msgs.length === 0 && (
           <div className="text-center text-sm text-ink-300">
             <div className="text-3xl">🤖</div>
-            <p className="mt-2">Ssenariy: <b className="text-white">{scenario.s}</b>.</p>
-            <p className="mt-1">Boshlang: <button className="underline" onClick={() => send('Merhaba! Ben ' + (profile?.display_name ?? 'Valijon') + '. Nasılsın?')}>«Merhaba! Ben {profile?.display_name ?? '…'}. Nasılsın?»</button></p>
+            <p className="mt-2">{l({ uz: 'Ssenariy', tr: 'Senaryo' })}: <b className="text-white">{l(scenario.sl)}</b>.</p>
+            <p className="mt-1">{l({ uz: 'Boshlang', tr: 'Başlayın' })}: <button className="underline" onClick={() => send('Merhaba! Ben ' + (profile?.display_name ?? 'Valijon') + '. Nasılsın?')}>«Merhaba! Ben {profile?.display_name ?? '…'}. Nasılsın?»</button></p>
           </div>
         )}
         {msgs.map((m, i) => (
@@ -87,7 +90,7 @@ export default function TutorPage() {
               {m.data && showUz && <div className="mt-1 text-xs text-teal-200">{m.data.reply_uz}</div>}
               {m.data?.corrections && m.data.corrections.length > 0 && m.data.corrections.some((c) => c.wrong) && (
                 <div className="mt-2 rounded-xl bg-rose-500/10 p-2 text-xs">
-                  <div className="mb-1 font-semibold text-rose-200">✏️ Tuzatishlar</div>
+                  <div className="mb-1 font-semibold text-rose-200">✏️ {l({ uz: 'Tuzatishlar', tr: 'Düzeltmeler' })}</div>
                   {m.data.corrections.filter((c) => c.wrong).map((c, k) => <div key={k} className="text-ink-200"><s className="text-rose-300">{c.wrong}</s> → <b className="text-teal-300">{c.right}</b> — {c.why}</div>)}
                 </div>
               )}
@@ -96,12 +99,12 @@ export default function TutorPage() {
             </div>
           </div>
         ))}
-        {busy && <div className="text-sm text-ink-400">AI yozmoqda…</div>}
+        {busy && <div className="text-sm text-ink-400">{l({ uz: 'AI yozmoqda…', tr: 'AI yazıyor…' })}</div>}
         {fail && (
           <div className="rounded-2xl border border-gold-400/30 bg-gold-400/10 p-3 text-sm text-gold-100">
-            <b>{fail.reason === 'quota' ? '⏳ AI dam olmoqda.' : fail.reason === 'disabled' ? '🔌 AI sozlanmagan.' : '⚠️ Xato.'}</b> {fail.message}
-            {fail.retryAt && <div className="text-xs">Qayta: {new Date(fail.retryAt).toLocaleTimeString('uz-UZ')}</div>}
-            <div className="mt-1 text-xs">Shu paytda <Link className="underline" href="/learn">dialog darslari</Link>ni o‘ynang — ular AI’siz ishlaydi.</div>
+            <b>{fail.reason === 'quota' ? l({ uz: '⏳ AI dam olmoqda.', tr: '⏳ AI dinleniyor.' }) : fail.reason === 'disabled' ? l({ uz: '🔌 AI sozlanmagan.', tr: '🔌 AI ayarlanmamış.' }) : `⚠️ ${t('error')}.`}</b> {fail.message}
+            {fail.retryAt && <div className="text-xs">{l({ uz: 'Qayta', tr: 'Tekrar' })}: {new Date(fail.retryAt).toLocaleTimeString('uz-UZ')}</div>}
+            <div className="mt-1 text-xs">{l({ uz: 'Shu paytda ', tr: 'Bu arada ' })}<Link className="underline" href="/learn">{l({ uz: 'dialog darslari', tr: 'diyalog dersleri' })}</Link>{l({ uz: 'ni o‘ynang — ular AI’siz ishlaydi.', tr: ' oynayın — AI olmadan çalışır.' })}</div>
           </div>
         )}
         <div ref={bottom} />
@@ -113,7 +116,7 @@ export default function TutorPage() {
         <div className="mt-2 flex items-center justify-between gap-2">
           <TurkishKeys onInsert={insert} />
           <div className="flex gap-1">
-            <button className="btn-ghost px-2 py-1 text-xs" onClick={() => { setMsgs([]); setTurns(0); }}>Tozalash</button>
+            <button className="btn-ghost px-2 py-1 text-xs" onClick={() => { setMsgs([]); setTurns(0); }}>{l({ uz: 'Tozalash', tr: 'Temizle' })}</button>
             <button className="btn-primary px-3 py-2" onClick={() => send()} disabled={busy || !input.trim()}><Send size={16} /></button>
           </div>
         </div>

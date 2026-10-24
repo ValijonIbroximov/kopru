@@ -8,12 +8,15 @@ import { SOUND_MAP } from '@/lib/turkish';
 import ExerciseRunner, { type RunnerState } from '@/components/exercises/ExerciseRunner';
 import SessionEnd from '@/components/exercises/SessionEnd';
 import { SpeakButton } from '@/components/exercises/ExerciseViews';
+import { speak } from '@/lib/speech';
 import { Markdown, Skeleton } from '@/components/ui';
 import { shuffle, uid } from '@/lib/utils';
+import { useLang } from '@/lib/i18n';
 
 export default function LessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const lessonId = Number(id);
+  const { l, t, lang } = useLang();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [words, setWords] = useState<Word[]>([]);
   const [pool, setPool] = useState<Word[]>([]);
@@ -107,28 +110,31 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
   if (phase === 'done' && summary) {
     const wrongIds = new Set(summary.s.results.filter((r) => !r.correct && r.wordId).map((r) => r.wordId));
     const mistakes = pool.filter((w) => wrongIds.has(w.id)).map((w) => ({ tr: w.tr, uz: w.uz }));
-    return <SessionEnd summary={summary.s} sessionId={summary.id} lessonId={lessonId} bonusXp={lesson.xp_reward} mistakes={mistakes} nextHref="/learn" nextLabel="O‘rganish yo‘li" onRetry={() => { setSummary(null); start(false); }} />;
+    return <SessionEnd summary={summary.s} sessionId={summary.id} lessonId={lessonId} bonusXp={lesson.xp_reward} mistakes={mistakes} nextHref="/learn" nextLabel={t('learning_path')} onRetry={() => { setSummary(null); start(false); }} />;
   }
 
+  const lessonTitle = lang === 'tr' && lesson.title_tr ? lesson.title_tr : lesson.title_uz;
+  const lessonAltTitle = lang === 'tr' && lesson.title_tr ? lesson.title_uz : lesson.title_tr;
+
   if (phase === 'running') {
-    return <ExerciseRunner key={resume?.id ?? 'new'} exercises={exercises} mode="lesson" lessonId={lessonId} title={lesson.title_uz} exitHref="/learn" resume={resume}
+    return <ExerciseRunner key={resume?.id ?? 'new'} exercises={exercises} mode="lesson" lessonId={lessonId} title={lessonTitle} exitHref="/learn" resume={resume}
       onFinish={(s, sid) => { setSummary({ s, id: sid }); setPhase('done'); }} />;
   }
 
   // ---------- INTRO ----------
   const c = lesson.content;
   const tabs: { label: string; node: React.ReactNode }[] = [];
-  if (c.intro || c.hook) tabs.push({ label: 'Kirish', node: (
+  if (c.intro || c.hook) tabs.push({ label: l({ uz: 'Kirish', tr: 'Giriş' }), node: (
     <div className="space-y-3 text-sm">
       {c.hook && <div className="rounded-2xl bg-ember-500/10 p-3 text-ember-200">🎯 {c.hook}</div>}
       {c.intro && <p className="leading-relaxed text-ink-100">{c.intro}</p>}
       {c.tip && <div className="rounded-2xl bg-teal-500/10 p-3 text-teal-200">💡 {c.tip}</div>}
     </div>) });
-  if (grammar.length) tabs.push({ label: 'Qoida', node: (
+  if (grammar.length) tabs.push({ label: l({ uz: 'Qoida', tr: 'Kural' }), node: (
     <div className="space-y-6">
-      {grammar.map((g) => <div key={g.id}><h3 className="mb-2 font-display text-lg font-bold">{g.title_uz} <span className="text-sm font-normal text-ink-400">{g.title_tr}</span></h3><Markdown text={g.explanation_md} /></div>)}
+      {grammar.map((g) => <div key={g.id}><h3 className="mb-2 font-display text-lg font-bold">{lang === 'tr' && g.title_tr ? g.title_tr : g.title_uz} <span className="text-sm font-normal text-ink-400">{lang === 'tr' && g.title_tr ? g.title_uz : g.title_tr}</span></h3><Markdown text={g.explanation_md} /></div>)}
     </div>) });
-  if (c.dialog) tabs.push({ label: 'Dialog', node: (
+  if (c.dialog) tabs.push({ label: l({ uz: 'Dialog', tr: 'Diyalog' }), node: (
     <div className="space-y-2">
       {c.dialog.map((ln, i) => (
         <div key={i} className={`flex items-start gap-2 ${ln.who === 'B' ? 'flex-row-reverse text-right' : ''}`}>
@@ -139,34 +145,43 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
         </div>
       ))}
     </div>) });
-  if (lesson.kind === 'cognates') tabs.push({ label: 'Tovush mosligi', node: (
+  if (lesson.kind === 'cognates') tabs.push({ label: l({ uz: 'Tovush mosligi', tr: 'Ses eşleşmesi' }), node: (
     <div className="grid gap-2 text-sm">
       {SOUND_MAP.map((s) => <div key={s.uz} className="card-soft flex items-center gap-3 p-3"><span className="w-20 shrink-0 font-bold text-ember-300">{s.uz} → {s.tr}</span><span className="text-ink-200">{s.example}</span></div>)}
     </div>) });
-  if (words.length) tabs.push({ label: `So‘zlar (${words.length})`, node: (
+  if (words.length) tabs.push({ label: l({ uz: `So‘zlar (${words.length})`, tr: `Kelimeler (${words.length})` }), node: (
     <div className="grid gap-1.5 sm:grid-cols-2">
       {words.slice().sort((a, b) => a.id - b.id).map((w) => (
-        <div key={w.id} className="card-soft flex items-center gap-2 p-2.5 text-sm">
-          <SpeakButton text={w.tr} size="sm" />
-          <div className="min-w-0 flex-1"><div className="font-semibold text-white">{w.tr}</div><div className="truncate text-xs text-ink-300">{w.uz}{w.cognate ? ` · ${w.false_friend ? '⚠️' : '🌉'} ${w.cognate}` : ''}</div></div>
+        <div key={w.id} className="card-soft flex items-start gap-2 p-2.5 text-sm">
+          <SpeakButton text={w.tr} size="sm" className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-white">{w.tr}</div>
+            <div className="truncate text-xs text-ink-300">{w.uz}{w.cognate ? ` · ${w.false_friend ? '⚠️' : '🌉'} ${w.cognate}` : ''}</div>
+            {w.example_tr && (
+              <button type="button" className="mt-1 flex w-full items-start gap-1.5 rounded-xl bg-white/[0.04] px-2 py-1.5 text-left text-xs hover:bg-white/[0.08]" onClick={() => speak(w.example_tr!)} title="🔊">
+                <span className="shrink-0 text-teal-300">🔊</span>
+                <span className="min-w-0"><span className="block text-ink-100">{w.example_tr}</span><span className="block text-ink-400">{w.example_uz}</span></span>
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>) });
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link href="/learn" className="text-xs text-ink-400">← O‘rganish yo‘li</Link>
-      <h1 className="title mt-1">{lesson.title_uz}</h1>
-      <p className="subtitle">{lesson.title_tr} · +{lesson.xp_reward} XP · {lesson.kind === 'boss' ? `${unitWords.length} so‘z, ${unitGrammar.length} qoida` : `${words.length} so‘z`}</p>
+      <Link href="/learn" className="text-xs text-ink-400">← {t('learning_path')}</Link>
+      <h1 className="title mt-1">{lessonTitle}</h1>
+      <p className="subtitle">{lessonAltTitle} · +{lesson.xp_reward} XP · {lesson.kind === 'boss' ? l({ uz: `${unitWords.length} so‘z, ${unitGrammar.length} qoida`, tr: `${unitWords.length} kelime, ${unitGrammar.length} kural` }) : l({ uz: `${words.length} so‘z`, tr: `${words.length} kelime` })}</p>
 
       <div className="mt-4 flex gap-1 overflow-x-auto scrollbar-none">
-        {tabs.map((t, i) => <button key={t.label} onClick={() => setTab(i)} className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${tab === i ? 'bg-white/10 text-white' : 'text-ink-400'}`}>{t.label}</button>)}
+        {tabs.map((tb, i) => <button key={tb.label} onClick={() => setTab(i)} className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${tab === i ? 'bg-white/10 text-white' : 'text-ink-400'}`}>{tb.label}</button>)}
       </div>
-      <div className="card mt-3 p-4">{tabs[tab]?.node ?? <p className="text-ink-300">Mashqlarni boshlang.</p>}</div>
+      <div className="card mt-3 p-4">{tabs[tab]?.node ?? <p className="text-ink-300">{l({ uz: 'Mashqlarni boshlang.', tr: 'Alıştırmalara başlayın.' })}</p>}</div>
 
       <div className="sticky bottom-0 mt-4 grid gap-2 bg-ink-950/80 py-3 backdrop-blur">
-        {resume && <button className="btn-primary" onClick={() => start(true)}>Davom ettirish ({resume.state.index}/{resume.state.queue.length}) →</button>}
-        <button className={resume ? 'btn-secondary' : 'btn-primary'} onClick={() => start(false)}>{lesson.kind === 'boss' ? '👑 Bossga kirish' : resume ? 'Yangidan boshlash' : 'Mashqlarni boshlash →'}</button>
+        {resume && <button className="btn-primary" onClick={() => start(true)}>{l({ uz: 'Davom ettirish', tr: 'Devam et' })} ({resume.state.index}/{resume.state.queue.length}) →</button>}
+        <button className={resume ? 'btn-secondary' : 'btn-primary'} onClick={() => start(false)}>{lesson.kind === 'boss' ? l({ uz: '👑 Bossga kirish', tr: '👑 Boss’a gir' }) : resume ? l({ uz: 'Yangidan boshlash', tr: 'Yeniden başla' }) : l({ uz: 'Mashqlarni boshlash →', tr: 'Alıştırmalara başla →' })}</button>
       </div>
     </div>
   );

@@ -6,7 +6,14 @@
 import { supabaseBrowser } from './supabase/client';
 import { isLocal } from './data';
 import type { Exercise } from './types';
-import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js';
+import type { L } from './i18n';
+
+/** Ikki tilli xato: UI da `l(e.text)` bilan ko'rsating; `message` — o'zbekcha zaxira (umumiy handlerlar uchun). */
+export class SocialError extends Error {
+  text: L;
+  constructor(text: L) { super(typeof text === 'string' ? text : text.uz); this.name = 'SocialError'; this.text = text; }
+}
+
 export interface UserLite { id: string; username: string; display_name: string | null; avatar: string; level: number; league?: string; streak: number; weekly_xp: number; xp?: number; last_active_date?: string | null }
 export interface SearchResult extends UserLite { relation: 'none' | 'friend' | 'sent' | 'incoming' | 'blocked' }
 export interface Friend extends UserLite { friendship_id: number; since: string; xp: number }
@@ -81,41 +88,19 @@ export async function markNotificationsRead(ids?: number[]) {
   if (ids?.length) q = q.in('id', ids);
   await q;
 }
+/** Har chaqiruvda noyob kanal nomi: bir xil topic ikki marta ochilsa Supabase "cannot add callbacks after subscribe" xatosini beradi. */
+const uniq = () => Math.random().toString(36).slice(2, 8);
 
-export function subscribeNotifications(
-  userId: string,
-  onNew: (n: Notification) => void
-) {
+export function subscribeNotifications(userId: string, onNew: (n: Notification) => void) {
   if (isLocal()) return () => {};
-
   const sb = supabaseBrowser();
-  const channelName = `notif:${userId}:${crypto.randomUUID()}`;
-
-  const ch = sb
-    .channel(channelName)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${userId}`,
-      },
-      (
-        payload: RealtimePostgresInsertPayload<
-          Record<string, unknown>
-        >
-      ) => {
-        onNew(payload.new as unknown as Notification);
-      }
-    )
-    .subscribe();
-
-  return () => {
-    void sb.removeChannel(ch);
-  };
+  try {
+    const ch = sb.channel(`notif:${userId}:${uniq()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (p) => onNew(p.new as Notification))
+      .subscribe();
+    return () => { sb.removeChannel(ch).catch(() => {}); };
+  } catch (e) { console.warn('realtime notif', e); return () => {}; }
 }
-
 
 // ---------- Faollik ----------
 export async function fetchFeed(limit = 40): Promise<Activity[]> {
@@ -179,25 +164,29 @@ export async function fetchMessages(opts: { withUser?: string; clubId?: string }
   const { data } = await q;
   return ((data as Message[]) ?? []).reverse();
 }
-export async function sendMessage(opts: { withUser?: string; clubId?: string }, text: string) {
+/** Xato bo'lsa — ikki tilli matn (`l()` bilan ko'rsating) yoki Supabase xabari; muvaffaqiyatda null. */
+export async function sendMessage(opts: { withUser?: string; clubId?: string }, text: string): Promise<L | null> {
   const uid = await me();
-  if (!uid) return 'Kirish kerak';
+  if (!uid) return { uz: 'Kirish kerak', tr: 'Giriş yapmanız gerekiyor' };
   const sb = supabaseBrowser();
   const { error } = await sb.from('messages').insert({ sender_id: uid, receiver_id: opts.withUser ?? null, club_id: opts.clubId ?? null, text: text.trim().slice(0, 500) });
-  if (error) return error.message.includes('row-level') ? 'Faqat do‘stlarga yoki o‘z klubingizga yozish mumkin' : error.message;
+  if (error) return error.message.includes('row-level') ? { uz: 'Faqat do‘stlarga yoki o‘z klubingizga yozish mumkin', tr: 'Yalnızca arkadaşlara veya kendi kulübünüze yazabilirsiniz' } : error.message;
   if (opts.withUser) await sb.rpc('notify', { p_user: opts.withUser, p_kind: 'message', p_payload: { text: text.slice(0, 80) } });
   return null;
 }
 export function subscribeMessages(opts: { withUser?: string; clubId?: string }, myId: string, onNew: (m: Message) => void) {
   if (isLocal()) return () => {};
   const filter = opts.clubId ? `club_id=eq.${opts.clubId}` : `receiver_id=eq.${myId}`;
-  const ch = supabaseBrowser().channel(`msg:${opts.clubId ?? opts.withUser}:${myId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter }, (p) => {
-      const m = p.new as Message;
-      if (opts.withUser && m.sender_id !== opts.withUser) return;
-      onNew(m);
-    }).subscribe();
-  return () => { ch.unsubscribe(); };
+  const sb = supabaseBrowser();
+  try {
+    const ch = sb.channel(`msg:${opts.clubId ?? opts.withUser}:${myId}:${uniq()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter }, (p) => {
+        const m = p.new as Message;
+        if (opts.withUser && m.sender_id !== opts.withUser) return;
+        onNew(m);
+      }).subscribe();
+    return () => { sb.removeChannel(ch).catch(() => {}); };
+  } catch (e) { console.warn('realtime msg', e); return () => {}; }
 }
 
 // ---------- Chaqiriqlar ----------
@@ -206,7 +195,7 @@ export async function createChallenge(opponentId: string, questions: Exercise[],
   const uid = await me();
   if (!uid) return null;
   const { data, error } = await supabaseBrowser().from('challenges').insert({ challenger_id: uid, opponent_id: opponentId, game, questions }).select('id').maybeSingle();
-  if (error) throw new Error(error.message.includes('row-level') ? 'Faqat do‘stlarni chaqirish mumkin' : error.message);
+  if (error) throw new SocialError(error.message.includes('row-level') ? { uz: 'Faqat do‘stlarni chaqirish mumkin', tr: 'Yalnızca arkadaşlara meydan okunabilir' } : error.message);
   return data?.id ?? null;
 }
 export async function fetchChallenges(): Promise<Challenge[]> {
@@ -267,13 +256,42 @@ export function dailyKey(d = new Date()) {
   return `daily:${d.toISOString().slice(0, 10)}`;
 }
 
-export const GAME_LABELS: Record<string, { title: string; icon: string; unit: string }> = {
-  blitz: { title: 'Blitz', icon: '⚡', unit: 'ball' },
-  rain: { title: 'So‘z yomg‘iri', icon: '🌧️', unit: 'ball' },
-  tower: { title: 'Minora', icon: '🗼', unit: 'qavat' },
-  bingo: { title: 'Bingo', icon: '🎱', unit: 'ball' },
-  memory: { title: 'Xotira kartalari', icon: '🧠', unit: 'ball' },
-  anagram: { title: 'Harf terish', icon: '🔡', unit: 'ball' },
-  bridge: { title: 'So‘z ko‘prigi', icon: '🌉', unit: 'ball' },
-  roleplay: { title: 'Rol o‘yini', icon: '🎭', unit: 'ball' },
+/** Rekordli o'yinlar — ikki tilli nom va birlik (UI da `l(g.title)`, `l(g.unit)`). */
+export const GAME_LABELS_L: Record<string, { title: { uz: string; tr: string }; icon: string; unit: { uz: string; tr: string } }> = {
+  blitz: { title: { uz: 'Blitz', tr: 'Blitz' }, icon: '⚡', unit: { uz: 'ball', tr: 'puan' } },
+  rain: { title: { uz: 'So‘z yomg‘iri', tr: 'Kelime yağmuru' }, icon: '🌧️', unit: { uz: 'ball', tr: 'puan' } },
+  tower: { title: { uz: 'Minora', tr: 'Kule' }, icon: '🗼', unit: { uz: 'qavat', tr: 'kat' } },
+  bingo: { title: { uz: 'Bingo', tr: 'Bingo' }, icon: '🎱', unit: { uz: 'ball', tr: 'puan' } },
+  memory: { title: { uz: 'Xotira kartalari', tr: 'Hafıza kartları' }, icon: '🧠', unit: { uz: 'ball', tr: 'puan' } },
+  anagram: { title: { uz: 'Harf terish', tr: 'Harf dizme' }, icon: '🔡', unit: { uz: 'ball', tr: 'puan' } },
+  bridge: { title: { uz: 'So‘z ko‘prigi', tr: 'Kelime köprüsü' }, icon: '🌉', unit: { uz: 'ball', tr: 'puan' } },
+  roleplay: { title: { uz: 'Rol o‘yini', tr: 'Rol oyunu' }, icon: '🎭', unit: { uz: 'ball', tr: 'puan' } },
 };
+
+/** Eski (bir tilli, o'zbekcha) shakl — orqaga moslik uchun GAME_LABELS_L dan hosil qilinadi. Yangi kod GAME_LABELS_L dan foydalansin. */
+export const GAME_LABELS: Record<string, { title: string; icon: string; unit: string }> = Object.fromEntries(
+  Object.entries(GAME_LABELS_L).map(([k, g]) => [k, { title: g.title.uz, icon: g.icon, unit: g.unit.uz }]),
+);
+
+// ---------- Ochiq profil (004_public_profile.sql) ----------
+export interface PublicProfile {
+  id: string; username: string; display_name: string | null; avatar: string; level: number; league: string; xp: number; weekly_xp: number;
+  streak: number; best_streak: number; level_cefr: string; created_at: string; last_active_date: string | null; allow_dm: boolean;
+  relation: 'me' | 'none' | 'friend' | 'sent' | 'incoming' | 'blocked' | string; friendship_id: number | null;
+  words_known: number; words_mastered: number; lessons_done: number; rank: number;
+  achievements: { code: string; icon: string; title: string; rarity: string }[];
+  scores: { game: string; score: number; plays: number }[];
+  club: { id: string; name: string; emoji: string; code: string; is_public: boolean; members: number } | null;
+  my_club: { id: string; name: string; emoji: string; code: string; is_owner: boolean } | null;
+}
+export async function fetchPublicProfile(username: string): Promise<PublicProfile | null> {
+  if (isLocal()) return null;
+  const { data, error } = await supabaseBrowser().rpc('public_profile', { p_username: username });
+  if (error) { console.warn('public_profile', error.message); return null; }
+  return (data as PublicProfile) ?? null;
+}
+/** Klubga taklif — bildirishnoma (kind 'club_invite'); qabul qiluvchi /club?code=KOD ga o'tadi */
+export async function inviteToClub(userId: string, club: { name: string; code: string; emoji?: string }) {
+  if (isLocal()) return;
+  await supabaseBrowser().rpc('notify', { p_user: userId, p_kind: 'club_invite', p_payload: { club: club.name, code: club.code, emoji: club.emoji ?? '🏛️' } });
+}

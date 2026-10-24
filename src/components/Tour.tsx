@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useLang, type L } from '@/lib/i18n';
 
-export interface TourStep { target: string; title: string; text: string; place?: 'top' | 'bottom' }
+export interface TourStep { target: string; title: L; text: L; place?: 'top' | 'bottom' }
 
 const KEY = 'kopru.tours.v1';
 export function tourSeen(id: string) { try { return Boolean((JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, boolean>)[id]); } catch { return false; } }
@@ -13,6 +14,7 @@ export function resetTours() { try { localStorage.removeItem(KEY); } catch { /* 
 export default function Tour({ id, steps, open, onClose }: { id: string; steps: TourStep[]; open: boolean; onClose: () => void }) {
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const { l, t } = useLang();
   const step = steps[i];
 
   useLayoutEffect(() => {
@@ -44,10 +46,10 @@ export default function Tour({ id, steps, open, onClose }: { id: string; steps: 
     <div className="fixed inset-0 z-[75]" onClick={next}>
       {rect ? <div className="coach-hole absolute transition-all duration-300" style={{ left: rect.left - 6, top: rect.top - 6, width: rect.width + 12, height: rect.height + 12 }} /> : <div className="absolute inset-0 bg-black/70" />}
       <div className={cn('absolute inset-x-4 mx-auto max-w-sm animate-pop rounded-2xl border border-white/10 bg-ink-900 p-4 shadow-card')} style={cardStyle} onClick={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-ink-400"><span>Sayohat · {i + 1}/{steps.length}</span><button onClick={finish} className="hover:text-white">o‘tkazib yuborish</button></div>
-        <div className="font-display text-lg font-bold text-white">{step.title}</div>
-        <p className="mt-1 text-sm text-ink-200">{step.text}</p>
-        <div className="mt-3 flex gap-2">{i > 0 && <button className="btn-secondary px-3 py-2 text-sm" onClick={() => setI(i - 1)}>←</button>}<button className="btn-primary flex-1 py-2 text-sm" onClick={next}>{i + 1 >= steps.length ? 'Tayyor!' : 'Keyingi →'}</button></div>
+        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-ink-400"><span>{t('tour')} · {i + 1}/{steps.length}</span><button onClick={finish} className="hover:text-white">{t('skip').toLowerCase()}</button></div>
+        <div className="font-display text-lg font-bold text-white">{l(step.title)}</div>
+        <p className="mt-1 text-sm text-ink-200">{l(step.text)}</p>
+        <div className="mt-3 flex gap-2">{i > 0 && <button className="btn-secondary px-3 py-2 text-sm" onClick={() => setI(i - 1)}>←</button>}<button className="btn-primary flex-1 py-2 text-sm" onClick={next}>{i + 1 >= steps.length ? t('done') : t('next')}</button></div>
       </div>
     </div>
   );

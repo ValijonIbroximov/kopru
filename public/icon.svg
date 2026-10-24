@@ -1,13 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ff8f4d"/>
+      <stop offset="0" stop-color="#ffcf4d"/>
+      <stop offset="0.55" stop-color="#ff8f4d"/>
       <stop offset="1" stop-color="#f43f6e"/>
     </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1427"/>
+      <stop offset="1" stop-color="#1a1040"/>
+    </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="28" fill="#0d1117"/>
-  <path d="M14 86 Q64 30 114 86" stroke="url(#g)" stroke-width="10" fill="none" stroke-linecap="round"/>
-  <path d="M30 86 V70 M50 86 V58 M78 86 V58 M98 86 V70" stroke="#2fd1bc" stroke-width="7" stroke-linecap="round"/>
-  <rect x="10" y="86" width="108" height="10" rx="5" fill="#2fd1bc"/>
-  <circle cx="64" cy="40" r="7" fill="#ffcf4d"/>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <!-- chaqmoq: "Tez" -->
+  <path d="M70 14 L34 70 L60 70 L52 114 L94 52 L68 52 Z" fill="url(#g)"/>
+  <!-- ko'prik yoyi: Oʻzbek ↔ Turk -->
+  <path d="M18 100 Q64 72 110 100" stroke="#2fd1bc" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="18" cy="100" r="5" fill="#2fd1bc"/>
+  <circle cx="110" cy="100" r="5" fill="#2fd1bc"/>
 </svg>
