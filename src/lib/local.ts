@@ -23,7 +23,7 @@ function fresh(): LocalDb {
     profile: {
       id: 'local', username: 'mehmon', display_name: 'Mehmon', avatar: '🦉', role: 'admin', level_cefr: 'A1', xp: 0, level: 1, weekly_xp: 0,
       league: 'bronze', streak: 0, best_streak: 0, streak_freezes: 1, last_active_date: null, daily_goal_min: 10, tz: 'Asia/Tashkent',
-      interests: {}, settings: {}, onboarded: true, banned: false, created_at: new Date().toISOString(),
+      interests: {}, settings: {}, onboarded: false, banned: false, created_at: new Date().toISOString(),
     },
     user_words: {}, lesson_progress: { 1: { user_id: 'local', lesson_id: 1, status: 'available', best_score: 0, stars: 0, attempts: 0, completed_at: null } },
     daily: {}, reviews: [], sessions: {},

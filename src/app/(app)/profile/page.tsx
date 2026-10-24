@@ -10,6 +10,10 @@ import { resetLocal } from '@/lib/local';
 import { PageHeader, Skeleton } from '@/components/ui';
 import { leagueIcon, leagueLabel, levelProgress, cn } from '@/lib/utils';
 import type { Cefr } from '@/lib/types';
+import { SCENES } from '@/components/visual/scenes';
+import type { Ambient } from '@/components/visual/SceneBackground';
+import { resetTips } from '@/components/Tip';
+import { resetTours } from '@/components/Tour';
 
 const AVATARS = ['🦉', '🦊', '🐺', '🦁', '🐯', '🐻', '🦅', '🐬', '🦋', '🌙', '⚡', '🌉'];
 const LEVELS: Cefr[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
@@ -27,11 +31,16 @@ export default function ProfilePage() {
   const [fb, setFb] = useState('');
   const [rating, setRating] = useState(5);
   const [busy, setBusy] = useState(false);
+  const [ambient, setAmbient] = useState<Ambient>('full');
+  const [scene, setScene] = useState('auto');
+  const [allowDm, setAllowDm] = useState(true);
 
   useEffect(() => {
     if (!profile) return;
     setName(profile.display_name ?? ''); setAvatar(profile.avatar); setGoal(profile.daily_goal_min); setLevel(profile.level_cefr);
-    setVoice(String((profile.settings as { voice?: string })?.voice ?? ''));
+    const ps = profile.settings as { voice?: string; ambient?: Ambient; scene?: string };
+    setVoice(String(ps?.voice ?? '')); setAmbient(ps?.ambient ?? 'full'); setScene(ps?.scene ?? 'auto');
+    setAllowDm((profile as unknown as { allow_dm?: boolean }).allow_dm ?? true);
     listTurkishVoices().then(setVoices);
   }, [profile]);
 
@@ -40,7 +49,9 @@ export default function ProfilePage() {
 
   async function save() {
     setBusy(true);
-    await updateProfile({ display_name: name.trim() || null, avatar, daily_goal_min: goal, level_cefr: level, settings: { ...(profile!.settings ?? {}), voice }, onboarded: true });
+    const patch: Record<string, unknown> = { display_name: name.trim() || null, avatar, daily_goal_min: goal, level_cefr: level, settings: { ...(profile!.settings ?? {}), voice, ambient, scene }, onboarded: true };
+    if (!isLocal()) patch.allow_dm = allowDm;
+    await updateProfile(patch as Partial<NonNullable<typeof profile>>);
     await refresh();
     setBusy(false);
     push({ kind: 'success', icon: '✅', title: 'Saqlandi' });
@@ -77,6 +88,29 @@ export default function ProfilePage() {
           {voices.length ? (
             <div className="flex gap-2"><select className="input" value={voice} onChange={(e) => setVoice(e.target.value)}><option value="">Avtomatik</option>{voices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}</select><button className="btn-secondary" onClick={() => speak('Merhaba! Köprü’ye hoş geldiniz.', { voiceName: voice || undefined })}>🔊</button></div>
           ) : <p className="text-sm text-ink-400">Brauzerda turkcha ovoz topilmadi. Chrome/Edge yoki tizimga "Türkçe" ovoz paketini o‘rnating.</p>}
+        </div>
+        <button className="btn-primary w-full" onClick={save} disabled={busy}>Saqlash</button>
+      </section>
+
+      <section className="card space-y-4 p-5">
+        <h2 className="font-display text-lg font-bold">Ko‘rinish</h2>
+        <div>
+          <label className="label">Fon animatsiyasi</label>
+          <div className="flex gap-2">{([['full', '✨ To‘liq', 'manzara + animatsiya + parallax'], ['lite', '🌙 Yengil', 'manzara, animatsiyasiz (kuchsiz telefon)'], ['off', '⬛ O‘chiq', 'oddiy qora fon']] as [Ambient, string, string][]).map(([v, l, d]) => <button key={v} onClick={() => setAmbient(v)} title={d} className={cn('chip py-2 text-sm', ambient === v && 'border-ember-400 bg-ember-500/20 text-white')}>{l}</button>)}</div>
+        </div>
+        <div>
+          <label className="label">Manzara</label>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setScene('auto')} className={cn('chip py-2 text-sm', scene === 'auto' && 'border-teal-400 bg-teal-500/20 text-white')}>🎲 Har kirishda boshqa</button>
+            {SCENES.map((s) => <button key={s.id} onClick={() => setScene(s.id)} className={cn('chip py-2 text-sm', scene === s.id && 'border-teal-400 bg-teal-500/20 text-white')} style={{ borderColor: scene === s.id ? s.accent : undefined }}>{s.name}</button>)}
+          </div>
+          <p className="mt-1 text-xs text-ink-400">Osmon rangi kun vaqtiga (tong/kun/oqshom/tun) moslashadi. Saqlashdan keyin kuchga kiradi.</p>
+        </div>
+        {!isLocal() && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={allowDm} onChange={(e) => setAllowDm(e.target.checked)} /> Do‘stlar menga shaxsiy xabar yoza oladi</label>}
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary px-3 py-2 text-xs" onClick={() => { resetTips(); resetTours(); push({ kind: 'success', title: 'Maslahatlar qayta yoqildi' }); }}>💡 Maslahat va sayohatni qayta ko‘rsatish</button>
+          <button className="btn-secondary px-3 py-2 text-xs" onClick={() => router.push('/dashboard?tour=1')}>🧭 Bosh sahifa sayohati</button>
+          <button className="btn-secondary px-3 py-2 text-xs" onClick={() => router.push('/onboarding')}>🚀 Boshlang‘ich sozlash</button>
         </div>
         <button className="btn-primary w-full" onClick={save} disabled={busy}>Saqlash</button>
       </section>

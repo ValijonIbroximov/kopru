@@ -10,7 +10,7 @@ const POS = ['noun', 'verb', 'adj', 'adv', 'phrase', 'number', 'pron'].map((v) =
 const KINDS = [['vocab', 'Lug‘at'], ['grammar', 'Grammatika'], ['dialog', 'Dialog'], ['culture', 'Madaniyat'], ['cognates', 'Qarindosh so‘zlar'], ['boss', 'Boss']].map(([v, l]) => ({ value: v, label: l }));
 
 export default function AdminContent() {
-  const [res, setRes] = useState<'units' | 'lessons' | 'words' | 'grammar_topics' | 'exercises' | 'quests' | 'achievements'>('words');
+  const [res, setRes] = useState<'units' | 'lessons' | 'words' | 'grammar_topics' | 'exercises' | 'quests' | 'achievements' | 'clubs' | 'messages' | 'activities'>('words');
   const [lessons, setLessons] = useState<{ value: number; label: string }[]>([]);
   const [units, setUnits] = useState<{ value: number; label: string }[]>([]);
   const [lessonFilter, setLessonFilter] = useState<number | ''>('');
@@ -63,6 +63,17 @@ export default function AdminContent() {
       { key: 'condition', label: 'Shart (JSON)', type: 'json', help: '{"metric":"streak|xp|level|words_seen|words_mastered|lessons_completed|reviews|duels_won|minutes|modes|perfect","gte":N}' },
       { key: 'xp_reward', label: 'XP', type: 'number' }, { key: 'is_active', label: 'Faol', type: 'bool' },
     ], defaults: { icon: '🏅', rarity: 'common', condition: { metric: 'streak', gte: 3 }, xp_reward: 50, is_active: true } },
+    clubs: { title: 'Klublar', order: 'created_at', search: ['name', 'code'], fields: [
+      { key: 'id', label: 'ID', type: 'readonly', list: false }, { key: 'emoji', label: 'Belgi', type: 'text' }, { key: 'name', label: 'Nomi', type: 'text' }, { key: 'code', label: 'Kod', type: 'text' },
+      { key: 'description', label: 'Tavsif', type: 'text', list: false }, { key: 'is_public', label: 'Ochiq', type: 'bool' }, { key: 'created_by', label: 'Egasi (user id)', type: 'readonly' }, { key: 'created_at', label: 'Yaratilgan', type: 'readonly' },
+    ] },
+    messages: { title: 'Xabarlar (moderatsiya)', order: 'created_at', search: ['text'], fields: [
+      { key: 'id', label: 'ID', type: 'readonly' }, { key: 'sender_id', label: 'Yuboruvchi', type: 'readonly' }, { key: 'receiver_id', label: 'Qabul qiluvchi', type: 'readonly' }, { key: 'club_id', label: 'Klub', type: 'readonly' },
+      { key: 'text', label: 'Matn', type: 'text' }, { key: 'created_at', label: 'Vaqt', type: 'readonly' },
+    ] },
+    activities: { title: 'Faollik lentasi', order: 'created_at', search: ['kind'], fields: [
+      { key: 'id', label: 'ID', type: 'readonly' }, { key: 'user_id', label: 'Foydalanuvchi', type: 'readonly' }, { key: 'kind', label: 'Turi', type: 'text' }, { key: 'payload', label: 'Ma’lumot (JSON)', type: 'json' }, { key: 'created_at', label: 'Vaqt', type: 'readonly' },
+    ] },
   };
   const cfg = FIELDS[res];
 

@@ -9,6 +9,45 @@ import {
 } from '@/lib/exercises';
 import type { Exercise } from '@/lib/types';
 import { shuffle } from '@/lib/utils';
+import type { HowToStep } from '@/components/games/HowToPlay';
+
+const HOWTO: Record<string, HowToStep[]> = {
+  review: [
+    { icon: '🧠', title: 'Unutish arafasidagi so‘zlar', text: 'Algoritm (FSRS) qaysi so‘zni bugun eslamasangiz unutilishini biladi — aynan ularni beradi. Shuning uchun navbat har kuni boshqa.' },
+    { icon: '🎲', title: 'Har so‘z — boshqa mashq', text: 'Tanlov, tinglash, yozish, to‘g‘ri/noto‘g‘ri, uyg‘unlik aralash keladi. Enter — davom etish, 1–4 — variant.' },
+    { icon: '⏱️', title: 'Tezlik ham baho', text: 'Tez va to‘g‘ri = "Oson" (so‘z uzoqqa ketadi), sekin = "Qiyin", xato = 5 daqiqadan keyin qaytadi. Ishora ishlatsangiz baho pasayadi.' },
+  ],
+  match: [
+    { icon: '🔗', title: 'Juftlarni ulang', text: 'Chapda turkcha, o‘ngda o‘zbekcha. Bittasini bosib, juftini bosing. To‘g‘ri bo‘lsa yashil bo‘lib yo‘qoladi.' },
+    { icon: '🎯', title: 'Xatosiz raund', text: '1 ta xatogacha — so‘zlar "Yaxshi" bahosi oladi. 4 raund, har raund 5 juft. Tez va yengil rejim.' },
+  ],
+  builder: [
+    { icon: '🧩', title: 'Gapni tuzing', text: 'Yuqorida o‘zbekcha gap. Pastdagi turkcha so‘zlarni to‘g‘ri tartibda bosing — ular yuqoridagi qatorga ko‘chadi.' },
+    { icon: '🪤', title: 'Ortiqcha so‘zlar bor', text: 'Ikki so‘z chalg‘ituvchi — ehtiyot bo‘ling. Noto‘g‘ri bosgan so‘zni yuqoridan bosib qaytaring.' },
+    { icon: '📐', title: 'So‘z tartibi', text: 'Turkcha tartib o‘zbekcha bilan deyarli bir xil: Ega → to‘ldiruvchi → kesim. "Ben okula gidiyorum" = "Men maktabga boryapman".' },
+  ],
+  harmony: [
+    { icon: '🎼', title: 'Qo‘shimcha tanlang', text: 'So‘z va kerakli qo‘shimcha turi beriladi (masalan -da, -lar, -im). 4 variantdan uyg‘unlikka mos shaklni bosing.' },
+    { icon: '🔤', title: 'Qoida', text: 'Oxirgi unli qalin (a ı o u) → a/ı/u; ingichka (e i ö ü) → e/i/ü. Jarangsizdan (ç f h k p s ş t) keyin d→t. p ç t k unli oldidan yumshaydi.' },
+    { icon: '⚡', title: 'Refleks', text: '12 ta zarba, javobdan keyin qoida izohi chiqadi. Maqsad — o‘ylamay to‘g‘ri tanlash.' },
+  ],
+  listen: [
+    { icon: '🎧', title: 'Eshiting', text: 'So‘z turkcha ovozda o‘qiladi (🔊 qayta eshitish, 🐢 sekin). Variantlardan eshitganingizni tanlang.' },
+    { icon: '⌨️', title: 'Diktant', text: 'Har 3-mashq — yozish: eshitganingizni tering. Turkcha harflar tugmachalari pastda. Kichik imlo xatosi "deyarli" deb qabul qilinadi.' },
+  ],
+  speak: [
+    { icon: '🎙️', title: 'Mikrofonni bosing', text: 'Jumlani ko‘ring, avval 🔊 eshiting, keyin mikrofonni bosib ovoz chiqarib o‘qing. Brauzer nutqingizni taniydi.' },
+    { icon: '📊', title: 'O‘xshashlik', text: '72% dan yuqori — qabul. 3 urinish bor. Nutqni tanish bo‘lmasa — ovoz chiqarib 3 marta takrorlab "davom" bosing.' },
+  ],
+  grammar: [
+    { icon: '📐', title: 'Bo‘sh joyni to‘ldiring', text: 'Gapda ___ joy bor. 4 ta qo‘shimcha variantidan to‘g‘risini bosing. Har javobdan keyin izoh.' },
+    { icon: '🌉', title: 'O‘zbekcha qoidani eslang', text: '-da/-dan/-ga/-ni/-ning → -da/-dan/-a/-ı/-ın; keldim → geldim. Farq faqat uyg‘unlikda.' },
+  ],
+  cognates: [
+    { icon: '🪢', title: 'Siz bilgan so‘zlar', text: 'O‘zbek va turk tillari qarindosh: ko‘z→göz, qush→kuş, tog‘→dağ. Tovush mosliklarini ilg‘asangiz yuzlab so‘z tayyor.' },
+    { icon: '⚠️', title: 'Yolg‘on do‘stlar', text: 'Ba’zi so‘zlar o‘xshaydi, lekin ma’nosi boshqa: olmak = bo‘lmoq, bulmak = topmoq, hazır = tayyor, dede = bobo, el = qo‘l. Ular alohida belgilangan.' },
+  ],
+};
 
 const CONFIG: Record<string, { title: string; icon: string; desc: string; tips: string[]; bonus: number; build: (c: GameContext) => Exercise[] | Promise<Exercise[]> }> = {
   review: {
@@ -68,5 +107,5 @@ export default function ModePage({ params }: { params: Promise<{ mode: string }>
   const { mode } = use(params);
   const cfg = CONFIG[mode];
   if (!cfg) notFound();
-  return <GamePage mode={mode} title={cfg.title} icon={cfg.icon} desc={cfg.desc} tips={cfg.tips} bonusXp={cfg.bonus} build={cfg.build} />;
+  return <GamePage mode={mode} title={cfg.title} icon={cfg.icon} desc={cfg.desc} tips={cfg.tips} bonusXp={cfg.bonus} build={cfg.build} howTo={HOWTO[mode]} />;
 }

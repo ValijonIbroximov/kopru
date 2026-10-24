@@ -7,6 +7,8 @@ import { useProfile } from '@/components/AppShell';
 import ExerciseRunner, { type RunnerState } from './ExerciseRunner';
 import SessionEnd from './SessionEnd';
 import { Skeleton } from '@/components/ui';
+import HowToPlay, { hasSeenHowTo, type HowToStep } from '@/components/games/HowToPlay';
+import { HelpCircle } from 'lucide-react';
 
 export interface GameContext {
   words: Word[];        // tanish so'zlar (boshlangan darslardan)
@@ -26,6 +28,7 @@ interface Props {
   bonusXp?: number;
   exitHref?: string;
   tips?: string[];
+  howTo?: HowToStep[];
 }
 
 /** Boshlangan darslardagi so'zlar; kam bo'lsa — birinchi darslar bilan to'ldiradi */
@@ -43,9 +46,10 @@ export function knownWords(all: Word[], lessons: Lesson[], progress: LessonProgr
   return known;
 }
 
-export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, exitHref = '/play', tips = [] }: Props) {
+export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, exitHref = '/play', tips = [], howTo }: Props) {
   const { settings } = useProfile();
   const [phase, setPhase] = useState<'loading' | 'ready' | 'running' | 'done'>('loading');
+  const [showHow, setShowHow] = useState(false);
   const [ctx, setCtx] = useState<GameContext | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [resume, setResume] = useState<{ id: string; state: RunnerState } | null>(null);
@@ -61,6 +65,7 @@ export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, 
         const st = active?.state as RunnerState | undefined;
         if (active && st && Array.isArray(st.queue) && st.queue.length && st.index < st.queue.length) setResume({ id: active.id, state: st });
         setPhase('ready');
+        if (howTo?.length && !hasSeenHowTo(mode)) setShowHow(true);
       } catch (e) {
         setError(String((e as Error).message));
       }
@@ -83,7 +88,9 @@ export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, 
   if (phase === 'ready') {
     return (
       <div className="mx-auto max-w-xl animate-pop">
-        <div className="card p-6">
+        {howTo && <HowToPlay id={mode} title={title} steps={howTo} open={showHow} onDone={() => setShowHow(false)} />}
+        <div className="card relative overflow-hidden p-6">
+          <div className="pointer-events-none absolute -right-6 -top-6 select-none text-[120px] opacity-10 blur-[1px]">{icon}</div>
           <div className="text-5xl">{icon}</div>
           <h1 className="title mt-3">{title}</h1>
           <p className="subtitle mt-1">{desc}</p>
@@ -91,8 +98,11 @@ export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, 
           {tips.length > 0 && <ul className="mt-4 space-y-1 text-sm text-ink-200">{tips.map((t, i) => <li key={i}>• {t}</li>)}</ul>}
           <div className="mt-6 grid gap-2">
             {resume && <button className="btn-primary" onClick={() => start(true)}>Davom ettirish ({resume.state.index}/{resume.state.queue.length}) →</button>}
-            <button className={resume ? 'btn-secondary' : 'btn-primary'} onClick={() => start(false)}>{resume ? 'Yangidan boshlash' : 'Boshlash →'}</button>
-            <Link href={exitHref} className="btn-ghost">Orqaga</Link>
+            <button className={resume ? 'btn-secondary' : 'btn-primary py-4 text-base'} onClick={() => start(false)}>{resume ? 'Yangidan boshlash' : 'Boshlash →'}</button>
+            <div className="flex gap-2">
+              {howTo && <button className="btn-secondary flex-1" onClick={() => setShowHow(true)}><HelpCircle size={16} /> Qanday o‘ynaladi</button>}
+              <Link href={exitHref} className="btn-ghost flex-1">Orqaga</Link>
+            </div>
           </div>
         </div>
       </div>

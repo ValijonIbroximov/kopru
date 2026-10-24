@@ -4,6 +4,8 @@ import { useProfile } from '@/components/AppShell';
 import { fetchStats, type UserStats } from '@/lib/data';
 import { analyzeMotivation, MODES } from '@/lib/motivation';
 import { PageHeader, Skeleton, Bar, ProgressRing } from '@/components/ui';
+import Reveal, { CountUp } from '@/components/visual/Reveal';
+import Tip from '@/components/Tip';
 import { todayKey, formatMinutes, cn } from '@/lib/utils';
 
 function Heatmap({ days, tz }: { days: { day: string; xp: number }[]; tz: string }) {
@@ -59,10 +61,12 @@ export default function StatsPage() {
   return (
     <div className="space-y-5">
       <PageHeader title="Statistika" sub="Bilim darajangiz, faollik, qiziqishlar va zaif joylar." />
+      <Tip id="stats-intro" text="«Mukammal» — so‘zni 21+ kun eslab qolish barqarorligi. «Sertifikatga tayyorlik» — so‘z boyligi (60%) + darslar (40%) bo‘yicha taxmin. Eng past ko‘nikmaga qarang — murabbiy shu rejimni tavsiya qiladi." />
 
+      <Reveal>
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="card flex items-center gap-4 p-4">
-          <ProgressRing value={readiness} size={84} color="#ffcf4d"><div className="text-center"><div className="font-display text-lg font-bold">{readiness}%</div></div></ProgressRing>
+          <ProgressRing value={readiness} size={84} color="#ffcf4d"><div className="text-center"><div className="font-display text-lg font-bold"><CountUp value={readiness} suffix="%" /></div></div></ProgressRing>
           <div><div className="text-xs text-ink-400">Sertifikatga tayyorlik ({profile.level_cefr})</div><div className="text-sm text-ink-200">{s.words.mastered} mukammal so‘z · {s.lessons.completed}/{s.lessons.total} dars</div></div>
         </div>
         <div className="card flex items-center gap-4 p-4">
@@ -78,11 +82,14 @@ export default function StatsPage() {
           </div>
         </div>
       </section>
+      </Reveal>
 
+      <Reveal delay={80}>
       <section className="card p-4">
         <div className="mb-2 flex items-center justify-between"><h2 className="font-display text-lg font-bold">Faollik (oxirgi 17 hafta)</h2><span className="text-xs text-ink-400">XP bo‘yicha</span></div>
         <Heatmap days={s.heatmap} tz={profile.tz} />
       </section>
+      </Reveal>
 
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="card p-4">

@@ -9,19 +9,21 @@
   --line: rgba(255, 255, 255, 0.07);
 }
 
-html, body {
+html {
   background: var(--bg);
   color: #e8ecf1;
   min-height: 100%;
 }
 body {
-  background-image:
-    radial-gradient(1200px 600px at 10% -10%, rgba(255, 106, 42, 0.12), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(20, 184, 166, 0.10), transparent 60%);
-  background-attachment: fixed;
+  /* shaffof: fon manzarasi (z-index -10) ko'rinishi uchun */
+  background: transparent;
+  color: #e8ecf1;
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
 * { -webkit-tap-highlight-color: transparent; }
 ::selection { background: rgba(255, 106, 42, 0.35); }
 
@@ -69,3 +71,45 @@ body {
   pointer-events: none;
   z-index: 60;
 }
+
+/* ===== 2-yangilanish: manzara animatsiyalari ===== */
+@keyframes twinkle { 0%, 100% { opacity: .25 } 50% { opacity: 1 } }
+@keyframes drift { from { transform: translateX(-320px) } to { transform: translateX(1500px) } }
+@keyframes sceneFloat { 0%, 100% { translate: 0 0 } 50% { translate: 0 -14px } }
+@keyframes waves { from { transform: translateX(0) } to { transform: translateX(-200px) } }
+@keyframes fog { 0%, 100% { opacity: .6; transform: translateX(0) } 50% { opacity: 1; transform: translateX(40px) } }
+@keyframes shooting { 0%, 86% { opacity: 0; transform: translate(0, 0) } 88% { opacity: 1 } 100% { opacity: 0; transform: translate(420px, 200px) } }
+@keyframes birds { from { transform: translate(-80px, 120px) } to { transform: translate(1500px, 60px) } }
+@keyframes rainShift { from { background-position: 0 0 } to { background-position: 0 40px } }
+@keyframes aurora { 0% { background-position: 0% 50% } 50% { background-position: 100% 50% } 100% { background-position: 0% 50% } }
+@keyframes rays { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+@keyframes pulseRing { 0% { transform: scale(.8); opacity: .8 } 100% { transform: scale(1.6); opacity: 0 } }
+@keyframes marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+
+.scene-twinkle { animation: twinkle 3.5s ease-in-out infinite; }
+.scene-drift { animation: drift 80s linear infinite; }
+.scene-float { animation: sceneFloat 8s ease-in-out infinite; }
+.scene-waves { animation: waves 6s linear infinite; }
+.scene-fog { animation: fog 14s ease-in-out infinite; }
+.scene-shooting { animation: shooting 9s ease-in infinite; }
+.scene-birds { animation: birds 45s linear infinite; }
+
+/* ===== scroll-reveal ===== */
+.reveal { opacity: 0; transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); will-change: opacity, transform; }
+.reveal-up { transform: translateY(22px); }
+.reveal-left { transform: translateX(-26px); }
+.reveal-right { transform: translateX(26px); }
+.reveal-scale { transform: scale(.94); }
+.reveal-fade { transform: none; }
+.reveal.in { opacity: 1; transform: none; }
+
+/* ===== dekor ===== */
+.aurora-text { background: linear-gradient(90deg, #ff8f4d, #f43f6e, #a78bfa, #2fd1bc, #ff8f4d); background-size: 300% 300%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: aurora 8s ease infinite; }
+.rays { background: conic-gradient(from 0deg, transparent 0 20deg, rgba(255,207,77,.18) 20deg 30deg, transparent 30deg 60deg, rgba(255,207,77,.18) 60deg 70deg, transparent 70deg 100deg, rgba(255,207,77,.18) 100deg 110deg, transparent 110deg 140deg, rgba(255,207,77,.18) 140deg 150deg, transparent 150deg 180deg, rgba(255,207,77,.18) 180deg 190deg, transparent 190deg 220deg, rgba(255,207,77,.18) 220deg 230deg, transparent 230deg 260deg, rgba(255,207,77,.18) 260deg 270deg, transparent 270deg 300deg, rgba(255,207,77,.18) 300deg 310deg, transparent 310deg 340deg, rgba(255,207,77,.18) 340deg 350deg, transparent 350deg 360deg); animation: rays 24s linear infinite; }
+.pulse-ring::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid rgba(255,106,42,.6); animation: pulseRing 1.6s ease-out infinite; }
+.marquee { display: flex; width: max-content; animation: marquee 40s linear infinite; }
+.marquee:hover { animation-play-state: paused; }
+.glass { background: rgba(13,17,23,.55); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); }
+.tilt { transition: transform .25s ease, box-shadow .25s ease; }
+.tilt:hover { transform: translateY(-3px) rotate(-.4deg); box-shadow: 0 18px 40px -18px rgba(255,106,42,.45); }
+.coach-hole { box-shadow: 0 0 0 9999px rgba(5,7,15,.78), 0 0 0 4px rgba(255,143,77,.9); border-radius: 18px; }

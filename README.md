@@ -220,3 +220,15 @@ src/app/api/             ai, ai/jobs, cron/daily, health
 ---
 
 © Valijon Ibroximov · Köprü — "O‘zbekdan turkka — o‘yin orqali"
+
+---
+
+## 9. 2-yangilanish (v2) — qisqacha
+
+> To‘liq tavsif va o‘rnatish ketma-ketligi: **UPDATE.md**. Majburiy qadam: Supabase SQL Editor → `supabase/migrations/002_social.sql` → Run.
+
+- **21 ta o‘yin rejimi** (8 ta yangi: Blitz + kunlik chaqiriq, So‘z yomg‘iri, Minora, Bingo, Xotira kartalari, Harf terish, So‘z ko‘prigi, Rol o‘yini), har birida «Qanday o‘ynaladi» o‘rgatuvchisi va rekordlar jadvali.
+- **Ijtimoiy qatlam**: do‘stlar, chat, «Hadi!» eslatma, asinxron chaqiriq-duel, faollik lentasi + reaksiyalar, klublar (50 kishigacha, klub chati, reyting), realtime bildirishnomalar.
+- **Onboarding**: 5 qadamli usta, bosh sahifa coach-mark sayohati, kontekstli maslahatlar, murabbiy takliflari, kunlik 3 qadamli reja.
+- **Grafika**: 8 ta animatsion manzara (har kirishda boshqasi, kun vaqtiga mos osmon), parallax, scroll-reveal, yangi landing. Profil → Ko‘rinish: To‘liq/Yengil/O‘chiq.
+- `push.bat` — Windows’da bir bosishda commit + push.

@@ -19,8 +19,12 @@ function Spark({ data, color = '#2fd1bc' }: { data: number[]; color?: string }) 
 
 export default function AdminHome() {
   const [o, setO] = useState<Overview | null>(null);
+  const [soc, setSoc] = useState<Record<string, number> | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { supabaseBrowser().rpc('admin_overview').then(({ data, error }) => { if (error) setErr(error.message); else setO(data as Overview); }); }, []);
+  useEffect(() => {
+    supabaseBrowser().rpc('admin_overview').then(({ data, error }) => { if (error) setErr(error.message); else setO(data as Overview); });
+    supabaseBrowser().rpc('admin_social_overview').then(({ data }) => setSoc((data as Record<string, number>) ?? null));
+  }, []);
   if (err) return <div className="card p-4 text-rose-300">{err}</div>;
   if (!o) return <div className="space-y-3"><Skeleton className="h-24" /><Skeleton className="h-40" /></div>;
 
@@ -35,6 +39,13 @@ export default function AdminHome() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {K.map(([l, v, s]) => <div key={String(l)} className="card-soft p-3"><div className="text-xs text-ink-400">{l}</div><div className="font-display text-2xl font-bold">{v}</div><div className="text-xs text-ink-400">{s}</div></div>)}
       </div>
+      {soc && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[['Do‘stliklar', soc.friendships, `${soc.pending} kutilmoqda`], ['Klublar', soc.clubs, `${soc.club_members} a’zo`], ['Xabarlar (7 kun)', soc.messages_7d, 'DM + klub'], ['Chaqiriqlar (7 kun)', soc.challenges_7d, `${soc.activities_7d} faollik · ${soc.scores} rekord`]].map(([l, v, s]) => (
+            <div key={String(l)} className="card-soft p-3"><div className="text-xs text-ink-400">{l}</div><div className="font-display text-2xl font-bold text-teal-300">{v}</div><div className="text-xs text-ink-400">{s}</div></div>
+          ))}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="card p-4"><div className="text-xs text-ink-400">Faol foydalanuvchilar (30 kun)</div><Spark data={series.map((d) => d.users)} /></div>
         <div className="card p-4"><div className="text-xs text-ink-400">XP (30 kun)</div><Spark data={series.map((d) => d.xp)} color="#ff6a2a" /></div>
