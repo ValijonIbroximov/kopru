@@ -19,7 +19,7 @@ interface Tile { id: number; ch: string }
 
 function Anagram({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
   const words = useMemo(() => {
-    const ok = (data.words.length >= 6 ? data.words : data.allWords).filter((w) => /^[a-zçğıöşüâîû]{3,10}$/i.test(w.tr));
+    const ok = (data.words).filter((w) => /^[a-zçğıöşüâîû]{3,10}$/i.test(w.tr));
     return shuffle(ok).slice(0, 10);
   }, [data]);
   const [i, setI] = useState(0);

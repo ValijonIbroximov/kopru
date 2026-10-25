@@ -85,7 +85,7 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
   const pathname = usePathname();
   useEffect(() => { stopSpeech(); }, [pathname]);
   const router = useRouter();
-  const { t } = useLang();
+  const { t, l } = useLang();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -101,6 +101,7 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
     { href: '/stats', label: t('stats'), icon: BarChart3, tour: 'nav-stats' },
   ];
   const SIDE_EXTRA = [
+    { href: '/vocabulary', label: l({ uz: 'Mening lug‘atim', tr: 'Kelimelerim' }), icon: BookOpen },
     { href: '/coach', label: 'Shaxsiy murabbiy', icon: BookOpen },
     { href: '/plan', label: t('plan'), icon: CalendarCheck },
     { href: '/leaderboard', label: t('leaderboard'), icon: Trophy },

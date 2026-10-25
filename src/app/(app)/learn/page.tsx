@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { orderedLessons, lessonIsOpen } from '@/lib/game-policy';
 import { Lock, Check } from 'lucide-react';
 import { fetchUnits, fetchLessons, fetchLessonProgress, fetchWords } from '@/lib/data';
 import type { Unit, Lesson, LessonProgress } from '@/lib/types';
@@ -39,15 +40,13 @@ export default function LearnPage() {
   if (!ready) return <div className="space-y-3"><Skeleton className="h-10 w-1/2" /><Skeleton className="h-48" /><Skeleton className="h-48" /></div>;
 
   const pmap = new Map(progress.map((p) => [p.lesson_id, p]));
-  const ordered = lessons.slice().sort((a, b) => (units.find((u) => u.id === a.unit_id)?.order_index ?? 0) - (units.find((u) => u.id === b.unit_id)?.order_index ?? 0) || a.order_index - b.order_index);
-  // Ochiq darslar: tugallangan/boshlangan + birinchi tugallanmagan
-  const firstOpen = ordered.find((l) => pmap.get(l.id)?.status !== 'completed');
-  const isUnlocked = (l: Lesson) => { const st = pmap.get(l.id)?.status; return st === 'completed' || st === 'in_progress' || st === 'available' || l.id === firstOpen?.id; };
+  const ordered = orderedLessons(lessons, units);
+  const isUnlocked = (lesson: Lesson) => lessonIsOpen(lesson.id, ordered, progress);
   const completedCount = progress.filter((p) => p.status === 'completed').length;
 
   return (
     <div>
-      <PageHeader title={t('learning_path')} sub={l({ uz: `${completedCount}/${lessons.length} dars yakunlandi · A1 → A2 → (admin paneldan B1, B2 qo‘shing)`, tr: `${completedCount}/${lessons.length} ders tamamlandı · A1 → A2 → (yönetici panelinden B1, B2 ekleyin)` })} />
+      <PageHeader title={t('learning_path')} sub={l({ uz: `${completedCount}/${lessons.length} dars yakunlandi · Bosqichma-bosqich o‘rganish`, tr: `${completedCount}/${lessons.length} ders tamamlandı · Adım adım öğrenme` })} />
       <div className="space-y-6">
         {units.map((u) => {
           const ls = ordered.filter((l) => l.unit_id === u.id);

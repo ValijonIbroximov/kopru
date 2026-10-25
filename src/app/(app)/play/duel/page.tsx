@@ -5,7 +5,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useProfile } from '@/components/AppShell';
 import { useToast } from '@/components/Toast';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import { fetchWords, fetchLessonProgress, fetchLessons, addXp, finishSession, checkAchievements, isLocal } from '@/lib/data';
+import { fetchUserWords, fetchWords, fetchLessonProgress, fetchLessons, addXp, finishSession, checkAchievements, isLocal } from '@/lib/data';
 import { knownWords } from '@/components/exercises/GamePage';
 import { buildDuelQuestions } from '@/lib/exercises';
 import type { ChoiceExercise, Duel } from '@/lib/types';
@@ -26,6 +26,7 @@ export default function DuelPage() {
   const sub = useSub();
   const [phase, setPhase] = useState<Phase>('lobby');
   const [duel, setDuel] = useState<Duel | null>(null);
+  const [commonAccepted, setCommonAccepted] = useState(false);
   const [code, setCode] = useState('');
   const [me, setMe] = useState<Peer | null>(null);
   const [peer, setPeer] = useState<Peer | null>(null);
@@ -79,8 +80,9 @@ export default function DuelPage() {
     busyRef.current = true;
     setErr(null);
     try {
-      const [all, lp, lessons] = await Promise.all([fetchWords(), fetchLessonProgress(), fetchLessons()]);
-      const qs = buildDuelQuestions(knownWords(all, lessons, lp, 30), 10);
+      const [all, lp, lessons, uw] = await Promise.all([fetchWords(), fetchLessonProgress(), fetchLessons(), fetchUserWords()]);
+      if (knownWords(all, lessons, lp, 0, uw).length < 10) throw new Error('Avval kamida 10 ta so‘zni darslarda mashq qiling.');
+      const qs = buildDuelQuestions(knownWords(all, lessons, lp, 30, uw), 10);
       const c = genCode();
       const { data, error } = await supabaseBrowser().from('duels').insert({ code: c, host_id: profile.id, questions: qs }).select('*').maybeSingle();
       if (error || !data) { setErr(error?.message ?? t('error')); return; }
@@ -101,19 +103,23 @@ export default function DuelPage() {
   async function joinDuel() {
     if (!profile || busyRef.current) return;
     busyRef.current = true;
-    setTimeout(() => { busyRef.current = false; }, 1500);
+    try {
     setErr(null);
     const c = code.trim().toUpperCase();
     const { data } = await supabaseBrowser().from('duels').select('*').eq('code', c).eq('status', 'waiting').maybeSingle();
     if (!data) { setErr(l({ uz: 'Bunday kod topilmadi yoki duel allaqachon boshlangan.', tr: 'Böyle bir kod bulunamadı ya da düello zaten başladı.' })); return; }
     if (data.host_id === profile.id) { setErr(l({ uz: 'O‘zingiz bilan duel qila olmaysiz 🙂', tr: 'Kendinizle düello yapamazsınız 🙂' })); return; }
-    const { data: upd, error } = await supabaseBrowser().from('duels').update({ guest_id: profile.id, status: 'playing', updated_at: new Date().toISOString() }).eq('id', data.id).select('*').maybeSingle();
+    const uw = await fetchUserWords();
+    const known = new Set(uw.filter(w=>w.state!=='new').map(w=>w.word_id));
+    if ((data.questions as ChoiceExercise[]).some(q=>q.wordId && !known.has(q.wordId)) && !commonAccepted) { setErr('Duelda siz hali mashq qilmagan so‘zlar bor. Quyidagi umumiy musobaqa roziligini belgilang yoki avval darslarni o‘ting.'); return; }
+    const { data: upd, error } = await supabaseBrowser().from('duels').update({ guest_id: profile.id, status: 'playing', updated_at: new Date().toISOString() }).eq('id', data.id).eq('status', 'waiting').is('guest_id', null).select('*').maybeSingle();
     if (error || !upd) { setErr(error?.message ?? l({ uz: 'Qo‘shilib bo‘lmadi', tr: 'Katılma başarısız oldu' })); return; }
     const self: Peer = { id: profile.id, name: profile.display_name ?? profile.username, avatar: profile.avatar, score: 0, index: 0, done: false };
     meRef.current = self; setMe(self);
     setDuel(upd as Duel);
     subscribe(upd as Duel, self);
     setTimeout(() => { chan.current?.send({ type: 'broadcast', event: 'start', payload: {} }); setPhase('playing'); shownAt.current = Date.now(); }, 600);
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Duelga qo‘shilib bo‘lmadi.'); } finally { busyRef.current = false; }
   }
 
   const questions = (duel?.questions ?? []) as ChoiceExercise[];
@@ -173,7 +179,8 @@ export default function DuelPage() {
             <div className="text-2xl">🔑</div><div className="mt-1 font-display text-lg font-bold">{l({ uz: 'Kod bilan qo‘shilish', tr: 'Kodla katıl' })}</div>
             <div className="mt-2 flex gap-2"><input className="input uppercase tracking-widest" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} placeholder="ABC123" /><button className="btn-primary" onClick={joinDuel} disabled={code.length < 6}>{l({ uz: 'Kirish', tr: 'Katıl' })}</button></div>
           </div>
-          {err && <div className="rounded-2xl bg-rose-500/15 p-3 text-sm text-rose-200">{err}</div>}
+          {phase === 'lobby' && <label className="mb-3 flex items-start gap-2 text-xs text-ink-300"><input type="checkbox" checked={commonAccepted} onChange={e=>setCommonAccepted(e.target.checked)}/>Umumiy duelda menga yangi so‘zlar ham bo‘lishiga roziman.</label>}
+        {err && <div className="rounded-2xl bg-rose-500/15 p-3 text-sm text-rose-200">{err}</div>}
         </div>
       </div>
     );

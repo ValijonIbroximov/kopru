@@ -17,6 +17,7 @@ import {
 } from './ExerciseViews';
 
 export interface RunnerState {
+  curriculumVersion?: number;
   queue: Exercise[];
   index: number;
   results: ExerciseResult[];
@@ -39,7 +40,7 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
   const router = useRouter();
   const { settings } = useProfile();
   const { t, l } = useLang();
-  const [state, setState] = useState<RunnerState>(() => resume?.state ?? { queue: exercises, index: 0, results: [], requeued: [], startedAt: Date.now() });
+  const [state, setState] = useState<RunnerState>(() => resume?.state ?? { curriculumVersion: 2, queue: exercises, index: 0, results: [], requeued: [], startedAt: Date.now() });
   const [sessionId, setSessionId] = useState<string | null>(resume?.id ?? null);
   const [answered, setAnswered] = useState<{ correct: boolean; detail?: string } | null>(null);
   const [combo, setCombo] = useState(0);

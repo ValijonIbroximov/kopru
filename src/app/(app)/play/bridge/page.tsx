@@ -18,7 +18,7 @@ const KEYS = ['a', 'b', 'c', 'ç', 'd', 'e', 'f', 'g', 'ğ', 'h', 'ı', 'i', 'j'
 const MAX = 6;
 
 function Bridge({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
-  const words = useMemo<Word[]>(() => shuffle((data.words.length >= 8 ? data.words : data.allWords).filter((w) => /^[a-zçğıöşü]{3,10}$/i.test(w.tr))).slice(0, 8), [data]);
+  const words = useMemo<Word[]>(() => shuffle((data.words).filter((w) => /^[a-zçğıöşü]{3,10}$/i.test(w.tr))).slice(0, 8), [data]);
   const [i, setI] = useState(0);
   const [guessed, setGuessed] = useState<Set<string>>(new Set());
   const [wrong, setWrong] = useState(0);

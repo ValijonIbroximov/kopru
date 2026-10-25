@@ -132,7 +132,8 @@ export async function completeLesson(lessonId: number, score: number, stars: num
 // ---------- SRS ----------
 export async function fetchUserWords(): Promise<UserWord[]> {
   if (isLocal()) return Object.values(loadLocal().user_words);
-  const { data } = await supabaseBrowser().from('user_words').select('*');
+  const { data, error } = await supabaseBrowser().from('user_words').select('*');
+  if (error) throw error;
   return (data as UserWord[]) ?? [];
 }
 

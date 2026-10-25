@@ -1,29 +1,41 @@
 'use client';
-/** O'yinlar uchun yengil SRS yordamchisi: bir marta yuklaydi, har javobda FSRS hisoblab serverga yozadi. */
 import { cardFromRow, gradeFromResult, schedule } from './fsrs';
 import { fetchUserWords, recordReview } from './data';
+import { createReviewQueue } from './review-queue';
 import type { UserWord } from './types';
-
+const sessions = new Set<SrsSession>();
+export async function flushGameReviews(mode: string, retry = false) {
+  let failures = 0;
+  for (const session of [...sessions]) {
+    if (session.mode !== mode) continue;
+    const failed = await session.flush(retry); failures += failed;
+    if (!failed) sessions.delete(session);
+  }
+  return failures;
+}
 export class SrsSession {
   private cards = new Map<number, UserWord>();
-  private loaded = false;
-  constructor(private mode: string, private retention = 0.9) {}
-
-  async load() {
-    if (this.loaded) return;
-    try { const uw = await fetchUserWords(); this.cards = new Map(uw.map((w) => [w.word_id, w])); } catch { /* noop */ }
-    this.loaded = true;
+  private loading: Promise<void> | null = null;
+  private queue = createReviewQueue();
+  constructor(readonly mode: string, private retention = 0.9) {}
+  load() {
+    if (!this.loading) this.loading = fetchUserWords().then(rows => { this.cards = new Map(rows.map(w=>[w.word_id,w])); }).catch(error=>{this.loading=null;throw error;});
+    // Existing callers load in an effect; grading will retry if loading failed.
+    return this.loading.catch(()=>{});
   }
-
-  /** To'g'ri/noto'g'ri javobni FSRS ga yozish (fon rejimida). */
-  grade(wordId: number | undefined, correct: boolean, responseMs: number, type?: string, usedHint = false) {
+  grade(wordId: number | undefined, correct: boolean, responseMs: number, type?: string, usedHint=false) {
     if (!wordId) return;
-    const prev = this.cards.get(wordId);
-    const g = gradeFromResult(correct, responseMs, usedHint, type);
-    const { card, elapsedDays } = schedule(cardFromRow(prev), g, new Date(), this.retention);
-    this.cards.set(wordId, { user_id: prev?.user_id ?? '', word_id: wordId, stability: card.stability, difficulty: card.difficulty, due: card.due.toISOString(), reps: card.reps, lapses: card.lapses, state: card.state, last_review: new Date().toISOString() });
-    recordReview(wordId, g, correct, card, responseMs, this.mode, elapsedDays).catch(() => {});
+    sessions.add(this);
+    this.queue.add(async () => {
+      if (!this.loading) this.load();
+      await this.loading;
+      const prev=this.cards.get(wordId);
+      const grade=gradeFromResult(correct,responseMs,usedHint,type);
+      const {card,elapsedDays}=schedule(cardFromRow(prev),grade,new Date(),this.retention);
+      await recordReview(wordId,grade,correct,card,responseMs,this.mode,elapsedDays);
+      this.cards.set(wordId,{user_id:prev?.user_id??'',word_id:wordId,stability:card.stability,difficulty:card.difficulty,due:card.due.toISOString(),reps:card.reps,lapses:card.lapses,state:card.state,last_review:new Date().toISOString()});
+    });
   }
-
-  state(wordId: number) { return this.cards.get(wordId) ?? null; }
+  flush(retry=false) { return this.queue.flush(retry); }
+  state(wordId:number) { return this.cards.get(wordId) ?? null; }
 }

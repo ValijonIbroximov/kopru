@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Exercise, GrammarTopic, SessionSummary, Word, AppSettings, Lesson, LessonProgress, UserWord } from '@/lib/types';
 import { fetchWords, fetchGrammar, fetchLessonProgress, fetchActiveSession, fetchLessons, fetchUserWords } from '@/lib/data';
 import { buildPool, getPoolMode, setPoolMode, nextLessonId, learnedWords, extendWords, type PoolMode } from '@/lib/wordpool';
+import { intro } from '@/lib/exercises';
 import PoolBar from '@/components/games/PoolBar';
 import { useProfile } from '@/components/AppShell';
 import ExerciseRunner, { type RunnerState } from './ExerciseRunner';
@@ -37,12 +38,9 @@ interface Props {
   minWords?: number;
 }
 
-/**
- * O'rganilgan so'zlar (boshlangan/yakunlangan darslar + SRS'da ko'rilganlar); `min` dan kam bo'lsa keyingi darslardan to'ldiriladi.
- * Chaqiriq/duel kabi "kafolatlangan hajm" kerak joylarda ishlatiladi. O'yinlar uchun GameShell/GamePage buildPool'dan foydalanadi.
- */
+/** Faqat SRS tarixida mavjud so‘zlar. min parametri eski chaqiruvlar mosligi uchun. */
 export function knownWords(all: Word[], lessons: Lesson[], progress: LessonProgress[], min = 24, userWords: UserWord[] = []): Word[] {
-  return extendWords(learnedWords(all, progress, userWords), all, lessons, min);
+  return learnedWords(all, progress, userWords);
 }
 
 export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, exitHref = '/play', tips = [], howTo, minWords = 8 }: Props) {
@@ -64,12 +62,12 @@ export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, 
   useEffect(() => {
     (async () => {
       try {
-        const [allWords, grammar, progress, lessons, userWords, active] = await Promise.all([fetchWords(), fetchGrammar(), fetchLessonProgress(), fetchLessons(), fetchUserWords().catch(() => [] as UserWord[]), fetchActiveSession(mode)]);
+        const [allWords, grammar, progress, lessons, userWords, active] = await Promise.all([fetchWords(), fetchGrammar(), fetchLessonProgress(), fetchLessons(), fetchUserWords(), fetchActiveSession(mode)]);
         const pm = getPoolMode(); setPoolModeState(pm);
         const c: GameContext = { words: buildPool(allWords, lessons, progress, userWords, minWords, pm).words, allWords, grammar, settings, lessons, progress, userWords };
         setCtx(c);
         const st = active?.state as RunnerState | undefined;
-        if (active && st && Array.isArray(st.queue) && st.queue.length && st.index < st.queue.length) setResume({ id: active.id, state: st });
+        if (active && st && st.curriculumVersion === 2 && Array.isArray(st.queue) && st.queue.length && st.index < st.queue.length) setResume({ id: active.id, state: st });
         setPhase('ready');
         if (howTo?.length && !hasSeenHowTo(mode)) setShowHow(true);
       } catch (e) {
@@ -84,7 +82,9 @@ export default function GamePage({ mode, title, icon, desc, build, bonusXp = 0, 
     const ex = await build(ctx);
     if (!ex.length) { setError(l({ uz: 'Bu rejim uchun hali yetarli so‘z yo‘q — avval 1–2 ta darsni o‘ting.', tr: 'Bu mod için henüz yeterli kelime yok — önce 1–2 ders tamamlayın.' })); return; }
     setResume(null);
-    setExercises(ex);
+    const known = new Set(learnedWords(ctx.allWords, ctx.progress, ctx.userWords).map(w=>w.id));
+    const fresh = ctx.words.filter(w=>!known.has(w.id));
+    setExercises([...fresh.map(intro), ...ex]);
     setPhase('running');
   }, [ctx, resume, build]);
 

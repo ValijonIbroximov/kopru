@@ -6,7 +6,7 @@ import { useToast } from '@/components/Toast';
 import BlitzEngine from '@/components/games/BlitzEngine';
 import type { GameResult } from '@/components/games/GameShell';
 import { fetchChallenge, submitChallengeScore, claimChallengeXp, type Challenge } from '@/lib/social';
-import { fetchWords, finishSession, checkAchievements } from '@/lib/data';
+import { fetchUserWords, fetchWords, finishSession, checkAchievements } from '@/lib/data';
 import { Skeleton, Confetti, Empty } from '@/components/ui';
 import type { ChoiceExercise, Word } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -18,13 +18,15 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
   const { push } = useToast();
   const { l, t } = useLang();
   const [c, setC] = useState<Challenge | null | undefined>(undefined);
+  const [accepted, setAccepted] = useState(false);
+  const [knownIds, setKnownIds] = useState<Set<number>>(new Set());
   const [words, setWords] = useState<Word[]>([]);
   const [phase, setPhase] = useState<'intro' | 'play' | 'result'>('intro');
   const [result, setResult] = useState<{ status: string; winner_id?: string | null; a?: number; b?: number } | null>(null);
   const [myScore, setMyScore] = useState<number | null>(null);
   const claimed = useRef(false);
 
-  useEffect(() => { (async () => { const [ch, ws] = await Promise.all([fetchChallenge(id), fetchWords()]); setC(ch); setWords(ws); })(); }, [id]);
+  useEffect(() => { (async () => { const [ch, ws, uw] = await Promise.all([fetchChallenge(id), fetchWords(), fetchUserWords()]); setC(ch); setWords(ws); setKnownIds(new Set(uw.filter(w=>w.state!=='new').map(w=>w.word_id))); })(); }, [id]);
 
   // G'olib/mag'lub: natija tayyor bo'lsa XP ni claim qilish (birinchi o'ynagan tomon uchun)
   useEffect(() => {
@@ -40,6 +42,7 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
   const other = mine ? c.opponent : c.challenger;
   const myStored = mine ? c.challenger_score : c.opponent_score;
   const theirStored = mine ? c.opponent_score : c.challenger_score;
+  const unknownCount = new Set((c.questions as ChoiceExercise[]).filter(q=>q.wordId && !knownIds.has(q.wordId)).map(q=>q.wordId)).size;
   const canPlay = c.status === 'pending' && myStored === null && new Date(c.expires_at) > new Date();
 
   async function onEnd(r: GameResult) {
@@ -90,7 +93,8 @@ export default function ChallengePage({ params }: { params: Promise<{ id: string
             : c.status === 'declined' ? l({ uz: 'Chaqiriq rad etildi.', tr: 'Meydan okuma reddedildi.' }) : l({ uz: 'Chaqiriq muddati o‘tdi.', tr: 'Meydan okumanın süresi doldu.' })}
         </div>
         <div className="mt-5 grid gap-2">
-          {canPlay && <button className="btn-primary py-4 text-base" onClick={() => setPhase('play')}>⚡ {t('play')}</button>}
+          {canPlay && unknownCount > 0 && <label className="card-soft flex items-start gap-3 p-3 text-left text-sm"><input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>{unknownCount} ta savol so‘zi hali mashq qilinmagan. Bu umumiy raqobat ekanini tushundim va qatnashaman.</span></label>}
+          {canPlay && <button disabled={unknownCount > 0 && !accepted} className="btn-primary py-4 text-base" onClick={() => setPhase('play')}>⚡ {t('play')}</button>}
           {done && other && <Link href={`/u/${other.username}`} className="btn-primary">{l({ uz: 'Revansh — raqib profilida', tr: 'Rövanş — rakip profilinde' })}</Link>}
           <Link href="/friends?tab=challenges" className="btn-secondary">{l({ uz: 'Chaqiriqlar', tr: 'Meydan okumalar' })}</Link>
         </div>

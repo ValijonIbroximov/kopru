@@ -29,8 +29,8 @@ function BlitzInner() {
 
   return (
     <GameShell key={variant} id="blitz" scoreKey={variant === 'daily' ? dKey : 'blitz'} title={variant === 'daily' ? { uz: 'Blitz — kunlik chaqiriq', tr: 'Blitz — günlük meydan okuma' } : 'Blitz'} icon="⚡"
-      desc={variant === 'daily' ? { uz: 'Bugun hamma uchun bir xil 40 savol. Bir kunda bir necha marta urinish mumkin — eng yaxshisi hisoblanadi.', tr: 'Bugün herkes için aynı 40 soru. Günde birkaç deneme yapılabilir — en iyisi sayılır.' } : { uz: '60 soniya, tez javoblar, combo. Rekordingizni yangilang.', tr: '60 saniye, hızlı cevaplar, kombo. Rekorunuzu yenileyin.' }}
-      howTo={HOWTO} minWords={8}
+      desc={variant === 'daily' ? { uz: 'Umumiy A1 musobaqasi: hali o‘tilmagan so‘zlar ham bo‘lishi mumkin. Shaxsiy mashq uchun «Erkin» rejimini tanlang. Bugun hamma uchun bir xil 40 savol. Bir kunda bir necha marta urinish mumkin — eng yaxshisi hisoblanadi.', tr: 'Bugün herkes için aynı 40 soru. Günde birkaç deneme yapılabilir — en iyisi sayılır.' } : { uz: '60 soniya, tez javoblar, combo. Rekordingizni yangilang.', tr: '60 saniye, hızlı cevaplar, kombo. Rekorunuzu yenileyin.' }}
+      howTo={HOWTO} minWords={variant === 'daily' ? 0 : 8}
       headerExtra={
         <div className="flex w-full flex-wrap items-center gap-2 pt-2">
           <div className="flex gap-1 rounded-full bg-white/[0.05] p-1">
@@ -43,7 +43,7 @@ function BlitzInner() {
       {(data, onEnd) => {
         const seed = variant === 'daily' ? daySeed : undefined;
         const pool = variant === 'daily' ? data.allWords.filter((w) => w.cefr === 'A1') : data.words;
-        const qs = buildBlitzQuestions(pool.length >= 6 ? pool : data.allWords, 40, seed);
+        const qs = buildBlitzQuestions(pool, 40, seed);
         return <BlitzEngine questions={qs} seconds={60} onEnd={onEnd} mode="blitz" allWords={data.allWords} />;
       }}
     </GameShell>

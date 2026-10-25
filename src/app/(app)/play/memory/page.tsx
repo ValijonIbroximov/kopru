@@ -18,7 +18,7 @@ function Memory({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => voi
   const pairs = 8;
   // raundlar soni o'rganilgan so'zlar soniga qarab: 8 → 1, 16 → 2, 24+ → 3 (yangi so'zlar aralashmaydi)
   const rounds = Math.max(1, Math.min(3, Math.floor(data.words.length / pairs)));
-  const deck = useMemo(() => shuffle(data.words.length >= pairs ? data.words : data.allWords).slice(0, pairs * rounds), [data, rounds]);
+  const deck = useMemo(() => shuffle(data.words).slice(0, pairs * rounds), [data, rounds]);
   const [round, setRound] = useState(0);
   const [cards, setCards] = useState<Card[]>([]);
   const [open, setOpen] = useState<number[]>([]);

@@ -7,6 +7,9 @@ import type { Word, GrammarTopic, Lesson, LessonProgress, SessionSummary, UserWo
 import { fetchWords, fetchGrammar, fetchLessonProgress, fetchLessons, fetchUserWords, finishSession, addXp, checkAchievements, type XpResult } from '@/lib/data';
 import { buildPool, getPoolMode, setPoolMode, nextLessonId, type PoolMode } from '@/lib/wordpool';
 import PoolBar from './PoolBar';
+import WordPreview from './WordPreview';
+import { flushGameReviews } from '@/lib/srs-client';
+import { gamePool } from '@/lib/game-policy';
 import { useProfile } from '@/components/AppShell';
 import { useToast } from '@/components/Toast';
 import { Skeleton, Confetti, ProgressRing } from '@/components/ui';
@@ -49,7 +52,7 @@ export default function GameShell({ id, title, icon, desc, howTo, minWords = 12,
   const { push } = useToast();
   const { l, t } = useLang();
   const [data, setData] = useState<GameData | null>(null);
-  const [phase, setPhase] = useState<'loading' | 'ready' | 'playing' | 'end'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'ready' | 'prepare' | 'playing' | 'end'>('loading');
   const [showHow, setShowHow] = useState(false);
   const [result, setResult] = useState<GameResult | null>(null);
   const [best, setBest] = useState<number | null>(null);
@@ -57,6 +60,10 @@ export default function GameShell({ id, title, icon, desc, howTo, minWords = 12,
   const [xpRes, setXpRes] = useState<XpResult | null>(null);
   const [top, setTop] = useState<HighScore[]>([]);
   const [runKey, setRunKey] = useState(0);
+  const [reviewFailures, setReviewFailures] = useState(0);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [previewWords, setPreviewWords] = useState<Word[]>([]);
   const [poolMode, setPoolModeState] = useState<PoolMode>('known');
   const key = scoreKey ?? id;
   const saving = useRef(false);
@@ -64,21 +71,21 @@ export default function GameShell({ id, title, icon, desc, howTo, minWords = 12,
 
   const compose = (mode: PoolMode) => {
     const r = raw.current; if (!r) return;
-    const pool = buildPool(r.allWords, r.lessons, r.progress, r.userWords, minWords, mode);
+    const pool = gamePool(id, r.allWords, r.lessons, r.progress, r.userWords, minWords, mode);
     setData({ words: pool.words, allWords: r.allWords, grammar: r.grammar, lessons: r.lessons, progress: r.progress, userWords: r.userWords });
   };
   const changeMode = (m: PoolMode) => { setPoolMode(m); setPoolModeState(m); compose(m); };
 
   useEffect(() => {
     (async () => {
-      const [allWords, grammar, progress, lessons, userWords, b, t] = await Promise.all([fetchWords(), fetchGrammar(), fetchLessonProgress(), fetchLessons(), fetchUserWords().catch(() => [] as UserWord[]), fetchMyBest(key), fetchHighScores(key, 5)]);
+      const [allWords, grammar, progress, lessons, userWords, b, t] = await Promise.all([fetchWords(), fetchGrammar(), fetchLessonProgress(), fetchLessons(), fetchUserWords(), fetchMyBest(key), fetchHighScores(key, 5)]);
       raw.current = { allWords, grammar, progress, lessons, userWords };
       const mode = getPoolMode(); setPoolModeState(mode); compose(mode);
       setBest(b); setTop(t);
       setPhase('ready');
       if (!hasSeenHowTo(id)) setShowHow(true);
-      else if (autoStart) setPhase('playing');
-    })();
+      // Start remains explicit so the vocabulary preflight cannot be bypassed.
+    })().catch(() => setLoadError(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, key, minWords, autoStart]);
 
@@ -87,6 +94,7 @@ export default function GameShell({ id, title, icon, desc, howTo, minWords = 12,
     saving.current = true;
     setResult(r); setPhase('end');
     try {
+      setReviewFailures(await flushGameReviews(id));
       await finishSession(null, id, Math.max(1, Math.round(r.durationSec / 60)), Boolean(r.perfect));
       const sc = await submitScore(key, r.score, { correct: r.correct, total: r.total });
       setRank({ best: sc.best, rank: sc.rank });
@@ -102,16 +110,26 @@ export default function GameShell({ id, title, icon, desc, howTo, minWords = 12,
       setBest(Math.max(best ?? 0, r.score));
       setTop(await fetchHighScores(key, 5));
       await refresh();
-    } finally { saving.current = false; }
+    } catch { setSaveMessage('Natijani saqlash yakunlanmadi. Sahifani yangilashdan oldin statistikani tekshiring.'); } finally { saving.current = false; }
   }
 
-  const start = () => { setRunKey((k) => k + 1); setResult(null); setRank(null); setXpRes(null); setPhase('playing'); };
+  const start = () => {
+    const r = raw.current; if (!r || saving.current) return;
+    const pool = gamePool(id, r.allWords, r.lessons, r.progress, r.userWords, minWords, poolMode);
+    if (!pool.enough) { setPhase('ready'); return; }
+    const known = new Set(pool.known.map(w => w.id));
+    const fresh = minWords > 0 ? pool.words.filter(w => !known.has(w.id)) : [];
+    setReviewFailures(0); setSaveMessage(''); setPreviewWords(fresh); setRunKey(k=>k+1); setResult(null); setRank(null); setXpRes(null);
+    setPhase(fresh.length ? 'prepare' : 'playing');
+  };
+  if (loadError) return <div role="alert" className="card p-6">O‘quv tarixi yuklanmadi. <Link href="/play" className="underline">O‘yinlarga qayting va qayta oching.</Link></div>;
+  if (phase === 'prepare') return <WordPreview key={runKey} words={previewWords} onDone={()=>setPhase('playing')} onBack={()=>setPhase('ready')}/>;
 
   if (phase === 'loading' || !data) return <div className="mx-auto max-w-xl space-y-3"><Skeleton className="h-40" /><Skeleton className="h-12" /></div>;
 
   if (phase === 'ready') {
     const r = raw.current!;
-    const pool = buildPool(r.allWords, r.lessons, r.progress, r.userWords, minWords, poolMode);
+    const pool = gamePool(id, r.allWords, r.lessons, r.progress, r.userWords, minWords, poolMode);
     const enough = pool.enough;
     return (
       <div className="mx-auto max-w-xl animate-pop">
@@ -153,6 +171,8 @@ export default function GameShell({ id, title, icon, desc, howTo, minWords = 12,
     const acc = result.total ? Math.round((result.correct / result.total) * 100) : 0;
     return (
       <div className="mx-auto max-w-xl animate-pop">
+        {saveMessage && <p role="alert" className="card mb-3 p-3 text-sm text-amber-300">{saveMessage}</p>}
+        {reviewFailures > 0 && <div role="alert" className="card mb-3 p-3 text-sm text-amber-300">Ayrim so‘zlar tarixi saqlanmadi.<button className="btn-secondary mt-2" onClick={async()=>setReviewFailures(await flushGameReviews(id,true))}>Qayta saqlash</button></div>}
         <Confetti run={Boolean(rank?.best && (best ?? 0) > 0) || acc >= 90} />
         <div className="card p-6 text-center">
           <div className="text-5xl">{rank?.best && result.score > 0 ? '🏅' : acc >= 70 ? '🎉' : '💪'}</div>

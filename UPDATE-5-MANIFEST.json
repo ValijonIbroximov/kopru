@@ -1,0 +1,237 @@
+{
+  "stages": [
+    1,
+    2
+  ],
+  "base_commit": "b52d924f9fb9ee475477b2a08742901c380af71a",
+  "files": [
+    {
+      "path": ".env.example",
+      "sha256": "42ecf78499449b148e074967f27f585775ad248c6e4dcbe60382ede0000715ca"
+    },
+    {
+      "path": "UPDATE-4-UZ.md",
+      "sha256": "630b4b7f5a809cd1b38f979e8b93203831f168ba3dfa0ddf0eff612f1ba54a0a"
+    },
+    {
+      "path": "UPDATE-5-UZ.md",
+      "sha256": "361a5c61275121d2bb384637273ee2c9d40ac9ab437c65dc227c24a9b08f9d79"
+    },
+    {
+      "path": "src/app/(app)/challenge/[id]/page.tsx",
+      "sha256": "97aec87f932acc058f7f2456da7a5241582620026d8a1f78f0b754bb443924b5"
+    },
+    {
+      "path": "src/app/(app)/coach/page.tsx",
+      "sha256": "b3f80acadb9030ba4d8ba34ec8c68c997fa3d7d2326c99b6277749160cd59e91"
+    },
+    {
+      "path": "src/app/(app)/dashboard/page.tsx",
+      "sha256": "1a5688ad4cf0740ce0a336ca0ea2fa3a2cc1e188d40f4be4dab35fefde47f46b"
+    },
+    {
+      "path": "src/app/(app)/friends/page.tsx",
+      "sha256": "63f53ca1dfb1fd0b07e69b8091a951877560d638a9ceae333b1530f6a5527e51"
+    },
+    {
+      "path": "src/app/(app)/learn/[id]/page.tsx",
+      "sha256": "66ecd8fdc7d24c08234eac86ff67ce202e6b36a5ea7c915e350c9537bf1ae903"
+    },
+    {
+      "path": "src/app/(app)/learn/page.tsx",
+      "sha256": "4f6d5edf0f54e09205be40f7349154a56512fa6d549a4374ba8541548a94f5ff"
+    },
+    {
+      "path": "src/app/(app)/loading.tsx",
+      "sha256": "7adb56e72c2585c60f948d3967ffe62c951c5a694a0cba6ea1ad0c5d414ccdca"
+    },
+    {
+      "path": "src/app/(app)/onboarding/page.tsx",
+      "sha256": "1e0017e9037b806d31e07a6f04bc45eed3b2f64bc290668b16f8ba945b2f3160"
+    },
+    {
+      "path": "src/app/(app)/play/[mode]/page.tsx",
+      "sha256": "905a78dbc64fbaf6ff87f5cbf5bb41fd716796d8aa478e0d8db750c98dfb8562"
+    },
+    {
+      "path": "src/app/(app)/play/anagram/page.tsx",
+      "sha256": "4bba2d2961295e3f0f34ec1562731991848fc774fe26058c8de8f63b87ecc4d0"
+    },
+    {
+      "path": "src/app/(app)/play/bingo/page.tsx",
+      "sha256": "6a9b862d965df19c65a173914e983554b7ad39e4eb2bcb8f518cc931839c12e8"
+    },
+    {
+      "path": "src/app/(app)/play/blitz/page.tsx",
+      "sha256": "1918cd72f43f43717b68897c3c342a4645b2a6aa31ececf6dd5240ac7ea5efc2"
+    },
+    {
+      "path": "src/app/(app)/play/bridge/page.tsx",
+      "sha256": "819d198aa8a911833c2c9c75c422a27c9feda30569880f65c0a086b9f5a4e0ef"
+    },
+    {
+      "path": "src/app/(app)/play/duel/page.tsx",
+      "sha256": "2e2556c5bd3849192f2e9001ae8c5c40625f374ff4f071f82c6ec48e0f30ee1e"
+    },
+    {
+      "path": "src/app/(app)/play/memory/page.tsx",
+      "sha256": "99f978183742f9c9ba20f7a75f1daef4cde4efbd48190ced9e359c9c2db40dc8"
+    },
+    {
+      "path": "src/app/(app)/play/rain/page.tsx",
+      "sha256": "fb0f65b5cdb7377ab7d63dd3e49a65cfddf046a278bc9519d09a27765d703a97"
+    },
+    {
+      "path": "src/app/(app)/play/roleplay/page.tsx",
+      "sha256": "89719ef7effb2730c65724ecf94e6611972394298151b387cc6706c42977a59e"
+    },
+    {
+      "path": "src/app/(app)/play/story/page.tsx",
+      "sha256": "dcdd48a077d464f06b9b91fb56c5c745802507f5b9df3930224ff552046ed422"
+    },
+    {
+      "path": "src/app/(app)/play/tower/page.tsx",
+      "sha256": "1347c787eb29e18f704c133c962776c6ab7646078969938c45158de4bbbe0c85"
+    },
+    {
+      "path": "src/app/(app)/tutor/page.tsx",
+      "sha256": "3fc9bd77631f87d267b6749beaf35d5f137c24824a84a03c73774351bc361d89"
+    },
+    {
+      "path": "src/app/(app)/vocabulary/page.tsx",
+      "sha256": "5efa3e8f9cd6ede73a0af0621a2ef7b3c2d5e9b229ee856d6efcbb8154428802"
+    },
+    {
+      "path": "src/app/api/ai/route.ts",
+      "sha256": "fbf6611f69d6691f4cc3bdb6a0adc44ee592f0a773706aa84b2d0edc143b3f3b"
+    },
+    {
+      "path": "src/app/api/tts/route.ts",
+      "sha256": "dbfad266cef7d6b6855c86ef388dd675c373ddc3c5ee79d7f890ce2f820b0da3"
+    },
+    {
+      "path": "src/app/globals.css",
+      "sha256": "0377ad7e8a56ca6c71a42a15bb8f38c54262fe07f7d7714d53ca2b2d21cec364"
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "sha256": "c3504e49022338bbb070f79c43149ed58fa0b8daf22f506a8a0393215eb3b5a5"
+    },
+    {
+      "path": "src/app/login/page.tsx",
+      "sha256": "f1b2b89f5fd4eb47891d3809bad35e48c4212f9f67684925c3458e84e8084a45"
+    },
+    {
+      "path": "src/app/page.tsx",
+      "sha256": "c1994019cfdfec365c453765006a28eea2da9fe1b27009459671c53e74c444da"
+    },
+    {
+      "path": "src/components/AppShell.tsx",
+      "sha256": "b35f39619c8bf0ff61b8b010c52ba1f5235e28288597ef9f475c4562552b0529"
+    },
+    {
+      "path": "src/components/VoicePicker.tsx",
+      "sha256": "60b7893acd0aa03d205391bd3db67ef7a839f2552bb027773d6616c9d4d27ef5"
+    },
+    {
+      "path": "src/components/exercises/ExerciseRunner.tsx",
+      "sha256": "f3ee6af53f050e7af76f69d428d82b804a85105fa297dbef1d598d0c2916d614"
+    },
+    {
+      "path": "src/components/exercises/ExerciseViews.tsx",
+      "sha256": "b3e00f127a74fd255c3ccb402b2bd5523235337d4a085b6c761571333f1dad8d"
+    },
+    {
+      "path": "src/components/exercises/GamePage.tsx",
+      "sha256": "fdbba32f0d8453ce55a3e9e89200262df3c42a65949219170bcd4af8def4a8ec"
+    },
+    {
+      "path": "src/components/games/GameShell.tsx",
+      "sha256": "0713910a7bafea5de17ff41750ac151318b4d2f82b166c9ae4c63b7ee574cb8b"
+    },
+    {
+      "path": "src/components/games/WordPreview.tsx",
+      "sha256": "6e9b47d1d7700618b8969e4879b73e86183c206f39e1f0ea12c0b099c2ff92e2"
+    },
+    {
+      "path": "src/components/visual/ThemeBackground.tsx",
+      "sha256": "f52b93aa0206ec95d4e09327f32f4af0311fa53b67d09a69d5a09e0b1c672ff3"
+    },
+    {
+      "path": "src/lib/ai/gateway.ts",
+      "sha256": "7cbe72faf1854187afcecda2eadae3c0a9c3691728cf525490eef4e0ba5b808f"
+    },
+    {
+      "path": "src/lib/ai/learner.ts",
+      "sha256": "792a9acef4a1d533f8019a8b81ed1a7fc607f464d1bbe0b59dab8285da4ae19f"
+    },
+    {
+      "path": "src/lib/ai/prompts.ts",
+      "sha256": "28b02ab7ca29e06be562ee039a8081e2df0949c616e7094a72f17948efe24ab4"
+    },
+    {
+      "path": "src/lib/ai/providers.ts",
+      "sha256": "b6d07c8306d387d173d9fe97852efe6c7a43a49fea184433a650838664e7799d"
+    },
+    {
+      "path": "src/lib/ai/validation.ts",
+      "sha256": "c8d47cd35bf76674e584b75e033bab5e1990a3a78bac47cdf4b3f2f4aa58c6d6"
+    },
+    {
+      "path": "src/lib/coach.ts",
+      "sha256": "88abab372dd4c5efe4c8875906cbc32832f83f6eb1010c07ea442b926903aa5c"
+    },
+    {
+      "path": "src/lib/content-cache.ts",
+      "sha256": "0740eb6205cb2a7412c989a94f92ef8618264e5a52ac72efb785b4f2baddcc7f"
+    },
+    {
+      "path": "src/lib/data.ts",
+      "sha256": "30c2e2e0bb4e1274be83f7aab7676a5576200bf259c42903b91b439efef155b3"
+    },
+    {
+      "path": "src/lib/exercises.ts",
+      "sha256": "422f60589db4bb4aa52cb248b30814e14b76074b34c4c6e35a38823509861ba1"
+    },
+    {
+      "path": "src/lib/game-policy.ts",
+      "sha256": "d22c207c4c8700e33105fd4746f959c5ba129a4275ee2ca8b7c7ae7a27d72397"
+    },
+    {
+      "path": "src/lib/review-queue.ts",
+      "sha256": "4af914ccd4c5b70c76fdf6c5644186c3547fc919f380f1e2f8128a893ffd8fbc"
+    },
+    {
+      "path": "src/lib/speech.ts",
+      "sha256": "10b951c0b2f7590a616e0fb5eee0e473b5cbf03f3cd28b97ea26217afee5f179"
+    },
+    {
+      "path": "src/lib/srs-client.ts",
+      "sha256": "c654e3c7063f6122ac071c8b9ffc8a89b14fbd7b64a028b6abd2b5ddea0f08e7"
+    },
+    {
+      "path": "src/lib/tts/edge.ts",
+      "sha256": "cf11fbe8189ef9dc788c07b340c56ef8b9247a3c392d44f17c37bb8a8c50bb0f"
+    },
+    {
+      "path": "src/lib/vocabulary.ts",
+      "sha256": "24b3babbd2d316401cef7bf04fd5ebbc3204a6d45a93679d00b712599696b140"
+    },
+    {
+      "path": "src/lib/wordpool.ts",
+      "sha256": "1fccc5ab457e1a94a59fa790a0b9a8964513c857042a2574ee75d66a180f2c05"
+    },
+    {
+      "path": "src/middleware.ts",
+      "sha256": "ee0cbb5e8997c97ce1862779627d4d49efc11817604b8edab87493a8c32bf1e8"
+    },
+    {
+      "path": "tests/regression.cjs",
+      "sha256": "16a0307e7a47c7350106ffae86c17e09f87c50dd989550205adaf246fcc94105"
+    },
+    {
+      "path": "tests/stage2.cjs",
+      "sha256": "b620c57699e5d2a5b69e909babf633d5feb4dbdf8455835d3d5ecaaf04710c55"
+    }
+  ]
+}

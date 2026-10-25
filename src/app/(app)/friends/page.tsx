@@ -10,7 +10,7 @@ import { PageHeader, Empty, Skeleton } from '@/components/ui';
 import Feed from '@/components/social/Feed';
 import ChatPanel from '@/components/social/ChatPanel';
 import Tip from '@/components/Tip';
-import { isLocal, fetchWords, fetchLessons, fetchLessonProgress } from '@/lib/data';
+import { isLocal, fetchUserWords, fetchWords, fetchLessons, fetchLessonProgress } from '@/lib/data';
 import { knownWords } from '@/components/exercises/GamePage';
 import { buildBlitzQuestions } from '@/components/games/BlitzEngine';
 import { searchUsers, sendFriendRequest, respondFriend, removeFriend, fetchFriends, fetchFriendRequests, nudge, createChallenge, fetchChallenges, declineChallenge, SocialError, type Friend, type FriendRequest, type SearchResult, type Challenge, type UserLite } from '@/lib/social';
@@ -49,8 +49,9 @@ function FriendsInner() {
   async function challenge(f: Friend) {
     setBusy(f.id);
     try {
-      const [all, lessons, lp] = await Promise.all([fetchWords(), fetchLessons(), fetchLessonProgress()]);
-      const qs = buildBlitzQuestions(knownWords(all, lessons, lp, 30), 20, Math.floor(Math.random() * 1e6));
+      const [all, lessons, lp, uw] = await Promise.all([fetchWords(), fetchLessons(), fetchLessonProgress(), fetchUserWords()]);
+      if (knownWords(all, lessons, lp, 0, uw).length < 10) throw new Error('Avval kamida 10 ta so‘zni darslarda mashq qiling.');
+      const qs = buildBlitzQuestions(knownWords(all, lessons, lp, 30, uw), 20, Math.floor(Math.random() * 1e6));
       const id = await createChallenge(f.id, qs);
       push({ kind: 'success', icon: '⚔️', title: l({ uz: 'Chaqiriq yaratildi', tr: 'Meydan okuma oluşturuldu' }), body: l({ uz: 'Endi o‘zingiz o‘ynaysiz — natijangiz do‘stingizga yuboriladi.', tr: 'Şimdi kendiniz oynayacaksınız — sonucunuz arkadaşınıza gönderilecek.' }) });
       if (id) router.push(`/challenge/${id}`);

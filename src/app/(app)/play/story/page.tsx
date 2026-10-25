@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useProfile } from '@/components/AppShell';
 import { useToast } from '@/components/Toast';
-import { callAi, fetchWords, fetchLessonProgress, fetchLessons, addXp, finishSession, checkAchievements, fetchAiJobs, isLocal } from '@/lib/data';
+import { callAi, fetchUserWords, fetchWords, fetchLessonProgress, fetchLessons, addXp, finishSession, checkAchievements, fetchAiJobs, isLocal } from '@/lib/data';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { knownWords } from '@/components/exercises/GamePage';
 import { SpeakButton } from '@/components/exercises/ExerciseViews';
@@ -42,13 +42,15 @@ export default function StoryPage() {
 
   async function generate(variant = 0) {
     setBusy(true); setFail(null); setStory(null); setAnswers({}); setRevealed(new Set()); setFinished(false);
-    const [all, lp, lessons] = await Promise.all([fetchWords(), fetchLessonProgress(), fetchLessons()]);
-    const known = knownWords(all, lessons, lp, 40).map((w) => w.tr).slice(0, 60);
+    try {
+    const [all, lp, lessons, uw] = await Promise.all([fetchWords(), fetchLessonProgress(), fetchLessons(), fetchUserWords()]);
+    const known = knownWords(all, lessons, lp, 40, uw).map((w) => w.tr).slice(0, 60);
     const dayNum = Math.floor(Date.now() / 86400000);
     const res = await callAi<StoryData>('story', { level: profile?.level_cefr ?? 'A1', topic, words: known, seed: `${dayNum}-${variant}`, length: settings.ai.story_words });
     setBusy(false);
     if (res.ok) { setStory(res.data); setStartedAt(Date.now()); if (res.cached) push({ kind: 'info', icon: '📚', title: l({ uz: 'Kontent bankidan', tr: 'İçerik bankasından' }), body: l({ uz: 'Bu hikoya oldin yaratilgan — AI limiti sarflanmadi.', tr: 'Bu hikâye daha önce oluşturulmuş — AI limiti harcanmadı.' }) }); }
     else setFail(res);
+    } catch { setFail({ok:false,reason:'error',message:'O‘quv tarixi yuklanmadi. Qayta urinib ko‘ring.'}); } finally { setBusy(false); }
   }
 
   async function finish() {

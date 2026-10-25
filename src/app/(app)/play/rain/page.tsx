@@ -16,7 +16,7 @@ const HOWTO = [
 interface Drop { id: number; word: Word; x: number; y: number; speed: number; correct: boolean; dying?: 'ok' | 'bad' }
 
 function Rain({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
-  const pool = useMemo(() => shuffle(data.words.length >= 8 ? data.words : data.allWords), [data]);
+  const pool = useMemo(() => shuffle(data.words), [data]);
   const [target, setTarget] = useState<Word>(pool[0]);
   const [drops, setDrops] = useState<Drop[]>([]);
   const [score, setScore] = useState(0);

@@ -2,8 +2,9 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Exercise, GrammarTopic, Lesson, SessionSummary, Word, ListenExercise, OrderExercise, ChoiceExercise } from '@/lib/types';
-import { fetchLesson, fetchWords, fetchGrammar, fetchDue, fetchActiveSession, fetchLessons, markLessonStarted, fetchUserWords, fetchLessonProgress } from '@/lib/data';
+import { fetchLesson, fetchWords, fetchGrammar, fetchDue, fetchActiveSession, fetchLessons, markLessonStarted, fetchUserWords, fetchLessonProgress, fetchUnits } from '@/lib/data';
 import { buildLessonSession, buildBossSession, buildGrammarSession, buildHarmonySession, choiceTrToUz, listenExercise, intro, speakExercise } from '@/lib/exercises';
+import { orderedLessons, lessonIsOpen } from '@/lib/game-policy';
 import { learnedWords } from '@/lib/wordpool';
 import { SOUND_MAP } from '@/lib/turkish';
 import ExerciseRunner, { type RunnerState } from '@/components/exercises/ExerciseRunner';
@@ -33,9 +34,12 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
+    let active = true; setPhase('loading'); setLoadError(''); setResume(null);
     (async () => {
-      const [l, all, g, due, active, lessons, uw, progress] = await Promise.all([fetchLesson(lessonId), fetchWords(), fetchGrammar(), fetchDue(8, 0), fetchActiveSession('lesson', lessonId), fetchLessons(), fetchUserWords(), fetchLessonProgress()]);
+      const [l, all, g, due, active, lessons, uw, progress, units] = await Promise.all([fetchLesson(lessonId), fetchWords(), fetchGrammar(), fetchDue(8, 0), fetchActiveSession('lesson', lessonId), fetchLessons(), fetchUserWords(), fetchLessonProgress(), fetchUnits()]);
+      if (!active) return;
       if (!l) { setLoadError('Dars topilmadi.'); return; }
+      if (!lessonIsOpen(lessonId, orderedLessons(lessons, units), progress)) { setLoadError('Bu darsga o‘tishdan oldin avvalgi darsni yakunlang.'); return; }
       setLesson(l);
       const known = learnedWords(all, progress, uw);
       setPool(known);
@@ -49,9 +53,10 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
       setUnitWords(known.filter((w) => w.lesson_id && unitLessonIds.has(w.lesson_id)));
       setUnitGrammar(g.filter((x) => x.lesson_id && unitLessonIds.has(x.lesson_id)));
       const st = active?.state as RunnerState | undefined;
-      if (active && st && Array.isArray(st.queue) && st.index < st.queue.length) setResume({ id: active.id, state: st });
+      if (active && st && st.curriculumVersion === 2 && Array.isArray(st.queue) && st.index < st.queue.length) setResume({ id: active.id, state: st });
       setPhase('intro');
-    })().catch(() => setLoadError('Dars yuklanmadi. Internetni tekshirib qayta oching.'));
+    })().catch(() => { if (active) setLoadError('Dars yuklanmadi. Internetni tekshirib qayta oching.'); });
+    return () => { active = false; };
   }, [lessonId]);
 
   const dialogExercises = useMemo((): Exercise[] => {

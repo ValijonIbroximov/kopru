@@ -18,8 +18,8 @@ type Floor = { ex: Exercise; kind: string };
 
 function Tower({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
   const floors = useMemo<Floor[]>(() => {
-    const ws = shuffle(data.words.length >= 8 ? data.words : data.allWords);
-    const pool = data.allWords; // chalg'ituvchilar uchun
+    const ws = shuffle(data.words);
+    const pool = data.words; // chalg'ituvchilar uchun
     const drills = shuffle(data.grammar.flatMap((g) => g.drills ?? []));
     const harmKnown = harmonyEligible(ws);
     const harm = harmKnown.length >= 4 ? harmKnown : harmonyEligible(pool);
@@ -99,8 +99,8 @@ function Tower({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void
       setFloor(nf);
     } else {
       // xato: shu qavat yangi (osonroq) savol bilan qaytadi
-      const w = shuffle(data.words.length ? data.words : data.allWords)[0];
-      const repl: Exercise = floor < 10 ? choiceTrToUz(w, data.allWords) : listenExercise(w, data.allWords, true);
+      const w = shuffle(data.words)[0];
+      const repl: Exercise = floor < 10 ? choiceTrToUz(w, data.words) : listenExercise(w, data.words, true);
       setOverride((o) => ({ ...o, [floor]: { ex: repl, kind: repl.type } }));
       shownAt.current = Date.now();
     }
