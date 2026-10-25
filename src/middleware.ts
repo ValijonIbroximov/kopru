@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Supabase sozlanmagan bo'lsa — hamma narsa ochiq (demo rejim)
-  if (!url || !anon) return response;
+  if (!url || !anon || pathname === '/api/tts') return response;
 
   const supabase = createServerClient(url, anon, {
     cookies: {

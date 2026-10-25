@@ -8,6 +8,7 @@ import { loadLocal, saveLocal, localContent, localAddXp, localStats } from './lo
 import type { Profile, Unit, Lesson, Word, GrammarTopic, UserWord, LessonProgress, UserQuest, Quest, AiKind, AiResponse, AppSettings } from './types';
 import type { Card } from './fsrs';
 import { todayKey, uid } from './utils';
+import { contentCache, clearContentCache } from './content-cache';
 import { DEFAULT_SETTINGS } from './settings';
 
 export const isLocal = () => !hasSupabaseEnv();
@@ -34,14 +35,22 @@ export async function updateProfile(patch: Partial<Profile>) {
 
 // ---------- Kontent ----------
 export async function fetchUnits(): Promise<Unit[]> {
+  return contentCache('units', async () => {
   if (isLocal()) return localContent.units;
-  const { data } = await supabaseBrowser().from('units').select('*').eq('is_published', true).order('order_index');
+  const { data, error } = await supabaseBrowser().from('units').select('*').eq('is_published', true).order('order_index');
+  if (error) throw error;
   return (data as Unit[]) ?? [];
+
+  });
 }
 export async function fetchLessons(): Promise<Lesson[]> {
+  return contentCache('lessons', async () => {
   if (isLocal()) return localContent.lessons;
-  const { data } = await supabaseBrowser().from('lessons').select('*').eq('is_published', true).order('order_index');
+  const { data, error } = await supabaseBrowser().from('lessons').select('*').eq('is_published', true).order('order_index');
+  if (error) throw error;
   return (data as Lesson[]) ?? [];
+
+  });
 }
 export async function fetchLesson(id: number): Promise<Lesson | null> {
   if (isLocal()) return localContent.lessons.find((l) => l.id === id) ?? null;
@@ -49,18 +58,26 @@ export async function fetchLesson(id: number): Promise<Lesson | null> {
   return (data as Lesson) ?? null;
 }
 export async function fetchWords(lessonId?: number): Promise<Word[]> {
+  return contentCache(`words:${lessonId ?? 'all'}`, async () => {
   if (isLocal()) return lessonId ? localContent.words.filter((w) => w.lesson_id === lessonId) : localContent.words;
   let q = supabaseBrowser().from('words').select('*').order('id');
   if (lessonId) q = q.eq('lesson_id', lessonId);
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) throw error;
   return (data as Word[]) ?? [];
+
+  });
 }
 export async function fetchGrammar(lessonId?: number): Promise<GrammarTopic[]> {
+  return contentCache(`grammar:${lessonId ?? 'all'}`, async () => {
   if (isLocal()) return lessonId ? localContent.grammar.filter((g) => g.lesson_id === lessonId) : localContent.grammar;
   let q = supabaseBrowser().from('grammar_topics').select('*').order('order_index');
   if (lessonId) q = q.eq('lesson_id', lessonId);
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) throw error;
   return (data as GrammarTopic[]) ?? [];
+
+  });
 }
 
 export async function fetchSettings(): Promise<AppSettings> {
@@ -88,7 +105,9 @@ export async function markLessonStarted(lessonId: number) {
   const sb = supabaseBrowser();
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) return;
-  await sb.from('lesson_progress').upsert({ user_id: auth.user.id, lesson_id: lessonId, status: 'in_progress' }, { onConflict: 'user_id,lesson_id', ignoreDuplicates: false });
+  // Takror ochilgan darsning completed holatini pasaytirmang.
+  await sb.from('lesson_progress').upsert({ user_id: auth.user.id, lesson_id: lessonId, status: 'in_progress' }, { onConflict: 'user_id,lesson_id', ignoreDuplicates: true });
+  await sb.from('lesson_progress').update({ status: 'in_progress' }).eq('user_id', auth.user.id).eq('lesson_id', lessonId).eq('status', 'available');
 }
 
 export async function completeLesson(lessonId: number, score: number, stars: number): Promise<number | null> {
@@ -132,7 +151,7 @@ export async function fetchDue(limit = 20, newLimit = 6): Promise<DueItem[]> {
   if (items.length < limit) {
     // yangi so'zlar: tugallangan darslardan boshlab
     const progress = await fetchLessonProgress();
-    const seenLessons = new Set(progress.filter((p) => p.status === 'completed' || p.status === 'in_progress').map((p) => p.lesson_id));
+    const seenLessons = new Set(progress.filter((p) => p.status === 'completed').map((p) => p.lesson_id));
     const candidates = words.filter((w) => !byId.has(w.id) && w.lesson_id && seenLessons.has(w.lesson_id));
     for (const w of candidates.slice(0, Math.min(newLimit, limit - items.length))) items.push({ word: w, state: null });
   }
@@ -154,10 +173,11 @@ export async function recordReview(wordId: number, grade: number, correct: boole
     saveLocal(db);
     return;
   }
-  await supabaseBrowser().rpc('record_review', {
+  const { error } = await supabaseBrowser().rpc('record_review', {
     p_word_id: wordId, p_grade: grade, p_correct: correct, p_stability: card.stability, p_difficulty: card.difficulty,
     p_due: card.due.toISOString(), p_state: card.state, p_response_ms: Math.round(responseMs), p_mode: mode, p_elapsed_days: elapsedDays,
   });
+  if (error) throw error;
 }
 
 // ---------- XP / sessiya ----------
@@ -285,7 +305,7 @@ export async function fetchLeaderboard(limit = 50) {
 export async function callAi<T = unknown>(kind: AiKind, payload: Record<string, unknown>): Promise<AiResponse<T>> {
   if (isLocal()) return { ok: false, reason: 'disabled', message: 'Demo rejimda AI mavjud emas. Supabase va AI kalitlarini sozlang.' };
   try {
-    const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, payload }) });
+    const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, payload }), signal: AbortSignal.timeout(55_000) });
     const json = (await res.json()) as AiResponse<T>;
     return json;
   } catch (e) {
@@ -301,6 +321,7 @@ export async function fetchAiJobs() {
 }
 
 export async function signOut() {
+  clearContentCache();
   if (isLocal()) return;
   await supabaseBrowser().auth.signOut();
 }

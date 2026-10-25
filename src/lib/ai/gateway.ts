@@ -3,9 +3,10 @@
  * Limit qayta tiklanganda hech narsa yo'qolmaydi: navbatdagi ishlar cron yoki keyingi
  * muvaffaqiyatli so'rovda avtomatik bajariladi, natija keshda saqlanadi.
  */
+import { validTutor } from './validation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AiKind, AiResponse, AiProviderState } from '@/lib/types';
-import { configuredProviders, type ProviderDef } from './providers';
+import { currentModel, configuredProviders, type ProviderDef } from './providers';
 import { buildPrompt, extractJson, SYSTEM_PROMPT } from './prompts';
 import { hashString } from '@/lib/utils';
 
@@ -38,8 +39,9 @@ function getMem(id: string): MemState {
 }
 
 export function cacheKey(kind: AiKind, payload: Record<string, unknown>) {
-  const norm = JSON.stringify(payload, Object.keys(payload).sort());
-  return `${kind}:${hashString(norm)}:${hashString(norm.split('').reverse().join(''))}`;
+  const stable = (v: unknown): unknown => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).sort(([a],[b]) => a.localeCompare(b)).map(([k,value]) => [k, stable(value)])) : v;
+  const norm = JSON.stringify(stable(payload));
+  return `v2:${kind}:${hashString(norm)}:${hashString(norm.split('').reverse().join(''))}`;
 }
 
 interface Candidate { def: ProviderDef; key: string; model: string; cap: number; priority: number }
@@ -63,7 +65,9 @@ async function loadCandidates(admin: SupabaseClient | null, reader: SupabaseClie
       if (t > m.cooldownUntil) m.cooldownUntil = t;
     }
     if (st && st.day === utcDay() && st.used_today > m.usedToday) m.usedToday = st.used_today;
-    out.push({ def: c.def, key: c.key, model: st?.model || c.model, cap: st?.daily_cap ?? 1000, priority: st?.priority ?? i + 1 });
+    const model = currentModel(c.def.id, st?.model || c.model);
+    if (c.def.id === 'openrouter' && model !== 'openrouter/free' && !model.endsWith(':free')) return;
+    out.push({ def: c.def, key: c.key, model, cap: st?.daily_cap ?? 1000, priority: st?.priority ?? i + 1 });
   });
   return out.sort((a, b) => a.priority - b.priority);
 }
@@ -165,16 +169,18 @@ export async function callChain(kind: AiKind, payload: Record<string, unknown>, 
   const candidates = await loadCandidates(ctx.admin, ctx.user);
   if (!candidates.length) return { ok: false, reason: 'disabled', message: 'Hech qanday AI provayder sozlanmagan (.env dagi *_API_KEY).' };
   const now = Date.now();
+  const deadline = now + 40_000;
   let earliest = Infinity;
   const errors: string[] = [];
   for (const c of candidates) {
     const m = getMem(c.def.id);
     if (m.cooldownUntil > now) { earliest = Math.min(earliest, m.cooldownUntil); continue; }
     if (m.usedToday >= c.cap) { earliest = Math.min(earliest, nextUtcMidnight().getTime()); continue; }
-    const r = await callProvider(c, spec.user, spec.temperature, spec.maxTokens);
+    if (Date.now() >= deadline - 1000) break;
+    const r = await callProvider(c, spec.user, spec.temperature, spec.maxTokens, Math.min(12_000, deadline - Date.now()));
     if (r.ok) {
       const data = extractJson(r.content);
-      if (data === null) {
+      if (data === null || (kind === 'tutor' && !validTutor(data))) {
         errors.push(`${c.def.id}: JSON o'qilmadi`);
         m.errors += 1;
         continue;

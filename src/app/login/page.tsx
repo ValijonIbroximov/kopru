@@ -14,7 +14,8 @@ function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
   const { l, t } = useLang();
-  const next = params.get('next') || '/dashboard';
+  const requestedNext = params.get('next') ?? '';
+  const next = /^\/(?![\/\\])/.test(requestedNext) ? requestedNext : '/dashboard';
   const [mode, setMode] = useState<'signin' | 'signup' | 'magic'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

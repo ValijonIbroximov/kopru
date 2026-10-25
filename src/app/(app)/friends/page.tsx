@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { Search, UserPlus, Swords, MessageCircle, Bell, Check, X, Trophy } from 'lucide-react';
 import { useProfile } from '@/components/AppShell';
@@ -19,6 +20,7 @@ import { leagueIcon, relativeDay, cn } from '@/lib/utils';
 type Tab = 'friends' | 'feed' | 'challenges' | 'requests' | 'search';
 
 function FriendsInner() {
+  const router = useRouter();
   const params = useSearchParams();
   const { profile } = useProfile();
   const { push } = useToast();
@@ -51,7 +53,7 @@ function FriendsInner() {
       const qs = buildBlitzQuestions(knownWords(all, lessons, lp, 30), 20, Math.floor(Math.random() * 1e6));
       const id = await createChallenge(f.id, qs);
       push({ kind: 'success', icon: '⚔️', title: l({ uz: 'Chaqiriq yaratildi', tr: 'Meydan okuma oluşturuldu' }), body: l({ uz: 'Endi o‘zingiz o‘ynaysiz — natijangiz do‘stingizga yuboriladi.', tr: 'Şimdi kendiniz oynayacaksınız — sonucunuz arkadaşınıza gönderilecek.' }) });
-      if (id) window.location.href = `/challenge/${id}`;
+      if (id) router.push(`/challenge/${id}`);
     } catch (e) { push({ kind: 'error', title: t('error'), body: e instanceof SocialError ? l(e.text) : String((e as Error).message) }); }
     setBusy(null);
   }

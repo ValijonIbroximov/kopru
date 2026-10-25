@@ -16,13 +16,14 @@ const MEM_MAX = 300;
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const text = (sp.get('text') ?? '').trim().slice(0, 400);
+  const text = (sp.get('text') ?? '').normalize('NFC').trim();
   const voiceKey = sp.get('voice') === 'ahmet' ? 'ahmet' : 'emel';
   const rateKey = sp.get('rate') === 'slow' ? 'slow' : 'normal';
+  if (text.length > 400) return NextResponse.json({ error: 'Matn 400 belgidan oshmasin' }, { status: 400 });
   if (!text) return NextResponse.json({ error: 'text kerak' }, { status: 400 });
   if (process.env.TTS_PROVIDER === 'browser') return NextResponse.json({ error: 'server TTS o‘chirilgan' }, { status: 503 });
 
-  const key = `${voiceKey}/${rateKey}/${createHash('sha1').update(text.toLocaleLowerCase('tr-TR')).digest('hex')}.mp3`;
+  const key = `v2/${voiceKey}/${rateKey}/${createHash('sha1').update(text).digest('hex')}.mp3`;
   const headers = { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-TTS-Source': 'cache' };
 
   const hit = mem.get(key);
@@ -39,10 +40,10 @@ export async function GET(req: NextRequest) {
   let buf: Buffer | null = null; let source = 'edge';
   const rate = rateKey === 'slow' ? '-30%' : '+0%';
   if (process.env.TTS_PROVIDER !== 'google') {
-    try { buf = await edgeSynthesize(text, EDGE_VOICES[voiceKey], rate); } catch (e) { console.warn('[tts] edge xato:', (e as Error).message); }
+    try { buf = await edgeSynthesize(text, EDGE_VOICES[voiceKey], rate, '+0Hz', 6500); } catch (e) { console.warn('[tts] edge xato:', (e as Error).message); }
   }
   if (!buf) {
-    try { buf = await googleSynthesize(text); source = 'google'; } catch (e) { console.warn('[tts] google xato:', (e as Error).message); }
+    try { buf = await googleSynthesize(text, rateKey === 'slow'); source = 'google'; } catch (e) { console.warn('[tts] google xato:', (e as Error).message); }
   }
   if (!buf) return NextResponse.json({ error: 'TTS vaqtincha mavjud emas' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
 

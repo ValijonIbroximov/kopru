@@ -34,7 +34,7 @@ interface Node { x: number; y: number; vx: number; vy: number; r: number; tur: n
 interface Impulse { a: Node; b: Node; u: number; sp: number }
 interface Letter { x: number; u: number; sp: number; t: string; dx: number; ph: number; sz: number }
 
-export default function ThemeBackground({ themeId, ambient = 'full' }: { themeId: string; ambient?: Ambient }) {
+export default function ThemeBackground({ themeId, ambient = 'lite' }: { themeId: string; ambient?: Ambient }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -176,6 +176,7 @@ export default function ThemeBackground({ themeId, ambient = 'full' }: { themeId
 
     function kadr(ts: number) {
       raf = 0;
+      if (!kam && oxirgi && ts - oxirgi < 1000 / 30) { raf = requestAnimationFrame(kadr); return; }
       const dt = oxirgi ? Math.min(0.05, Math.max(0.001, (ts - oxirgi) / 1000)) : 1 / 60;
       oxirgi = ts; vaqt += dt;
       chiz(dt);

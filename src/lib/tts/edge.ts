@@ -73,12 +73,16 @@ export function edgeSynthesize(text: string, voice = EDGE_VOICES.emel, rate = '+
 }
 
 /** Google Translate TTS (zaxira; ≤ 200 belgi) */
-export async function googleSynthesize(text: string): Promise<Buffer> {
-  const q = text.slice(0, 200);
-  const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=tr&client=tw-ob&q=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', Referer: 'https://translate.google.com/' } });
+export async function googleSynthesize(text: string, slow = false): Promise<Buffer> {
+  const parts = text.match(/.{1,180}(?:\s|$)|\S{1,180}/gu) ?? [];
+  const audio: Buffer[] = [];
+  for (const q of parts) {
+  const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=tr&client=tw-ob&ttsspeed=${slow ? '0.24' : '1'}&q=${encodeURIComponent(q)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(5000), headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', Referer: 'https://translate.google.com/' } });
   if (!res.ok) throw new Error(`google-tts ${res.status}`);
   const ab = await res.arrayBuffer();
   if (ab.byteLength < 500) throw new Error('google-tts: bo‘sh');
-  return Buffer.from(ab);
+  audio.push(Buffer.from(ab));
+  }
+  return Buffer.concat(audio);
 }

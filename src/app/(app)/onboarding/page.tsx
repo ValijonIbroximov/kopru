@@ -33,7 +33,7 @@ export default function Onboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [theme, setTheme] = useState(currentThemeId());
-  const [ambient, setAmbient] = useState<Ambient>('full');
+  const [ambient, setAmbient] = useState<Ambient>('lite');
   const [level, setLevel] = useState<Cefr>('A1');
   const [target, setTarget] = useState<Cefr>('A2');
   const [examDate, setExamDate] = useState<string>('');

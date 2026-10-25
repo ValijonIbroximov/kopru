@@ -111,6 +111,7 @@ function DashboardInner() {
 
   return (
     <div className="space-y-5">
+      <Link href="/coach" className="group flex items-center justify-between gap-4 rounded-3xl border border-teal-400/20 bg-gradient-to-r from-teal-500/15 to-transparent p-5"><div><div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-300">{l({uz:'Sizga mos • 3–10 daqiqa',tr:'Size özel • 3–10 dakika'})}</div><h2 className="mt-1 font-display text-xl font-bold">{l({uz:'Bugungi kichik g‘alabangiz',tr:'Bugünün küçük zaferi'})}</h2><p className="mt-1 text-xs text-ink-300">{l({uz:'Tanish so‘zlar. Xatolardan o‘rganish. Ortiqcha bosimsiz.',tr:'Bilinen kelimeler. Hatalardan öğrenme. Baskı olmadan.'})}</p></div><ChevronRight size={24} className="shrink-0 text-teal-300 transition group-hover:translate-x-1"/></Link>
       <Tour id="dashboard" steps={TOUR} open={tour} onClose={() => setTour(false)} />
       {isLocal() && <div className="rounded-2xl border border-gold-400/30 bg-gold-400/10 px-4 py-3 text-sm text-gold-200">{t('demo_banner')}</div>}
 

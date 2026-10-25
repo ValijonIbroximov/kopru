@@ -22,19 +22,20 @@ export interface ViewProps<T> {
 
 export function SpeakButton({ text, size = 'md', auto = false, className }: { text: string; size?: 'sm' | 'md' | 'lg'; auto?: boolean; className?: string }) {
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const ok = ttsAvailable();
-  const play = async () => { setBusy(true); await speak(text); setBusy(false); };
+  const play = async () => { setBusy(true); setFailed(false); try { setFailed(!(await speak(text))); } finally { setBusy(false); } };
   useEffect(() => {
     if (!auto || !ok) return;
     const t = setTimeout(() => { speak(text); }, 250);
     return () => clearTimeout(t);
   }, [auto, ok, text]);
   return (
-    <button type="button" onClick={play} disabled={!ok}
+    <span className="inline-flex flex-col items-center gap-1"><button type="button" onClick={play} disabled={!ok} aria-label="Turkcha talaffuzni tinglash" aria-busy={busy}
       className={cn('grid place-items-center rounded-2xl bg-teal-500/20 text-teal-300 transition hover:bg-teal-500/30 disabled:opacity-40', busy && 'animate-pulse',
-        size === 'lg' ? 'h-20 w-20' : size === 'md' ? 'h-12 w-12' : 'h-9 w-9', className)} title="🔊">
+        size === 'lg' ? 'h-20 w-20' : size === 'md' ? 'h-12 w-12' : 'h-9 w-9', className)} title="Turkcha tinglash">
       <Volume2 size={size === 'lg' ? 32 : size === 'md' ? 20 : 16} />
-    </button>
+    </button>{failed && <span role="status" className="max-w-40 text-center text-[11px] text-amber-300">Ovoz ochilmadi. Qayta bosing yoki qurilmaga turkcha ovoz o‘rnating.</span>}</span>
   );
 }
 

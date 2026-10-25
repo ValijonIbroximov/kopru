@@ -1,6 +1,6 @@
 /**
  * O'yinlar uchun so'z havzasi.
- *  - "known" (standart): FAQAT o'rganilgan so'zlar — boshlangan/yakunlangan darslar so'zlari + SRS'da ko'rilgan so'zlar.
+ *  - "known" (standart): FAQAT o'rganilgan so'zlar — SRS'da ko'rilgan so'zlar.
  *  - "extended": tanish so'zlar kam bo'lsa keyingi darslardan to'ldiriladi (foydalanuvchi o'zi tanlaydi).
  * Oldingi xato: "available" (ochiq, lekin o'tilmagan) darslar so'zlari ham "tanish" hisoblanardi — shu sababli
  * o'yinlarda hali o'rganilmagan so'zlar chiqib kelardi.
@@ -21,11 +21,12 @@ export function lessonOrder(lessons: Lesson[]): Lesson[] {
   return lessons.slice().sort((a, b) => a.unit_id - b.unit_id || a.order_index - b.order_index);
 }
 
-/** Haqiqatan o'rganilgan so'zlar: boshlangan/yakunlangan darslar + SRS'da ko'rilgan (state ≠ new) so'zlar */
+/** Haqiqatan o'rganilgan so'zlar: SRS'da amalda mashq qilingan (state ≠ new) so'zlar */
 export function learnedWords(all: Word[], progress: LessonProgress[], userWords: UserWord[] = []): Word[] {
-  const started = new Set(progress.filter((p) => p.status === 'in_progress' || p.status === 'completed').map((p) => p.lesson_id));
+  // Darsni ochish yoki tugatish undagi barcha so'zlarni ko'rganlikni anglatmaydi.
+  void progress;
   const seen = new Set(userWords.filter((u) => u.state && u.state !== 'new').map((u) => u.word_id));
-  return all.filter((w) => (w.lesson_id && started.has(w.lesson_id)) || seen.has(w.id));
+  return all.filter((w) => seen.has(w.id));
 }
 
 /** Kam bo'lsa — keyingi (hali o'tilmagan) darslar so'zlari bilan to'ldirish */

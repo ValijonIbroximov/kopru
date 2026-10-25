@@ -15,96 +15,84 @@ export function getVoicePref(): VoicePref {
 }
 export function setVoicePref(v: VoicePref) { try { localStorage.setItem(PREF_KEY, v); } catch { /* noop */ } }
 
-let voicesCache: SpeechSynthesisVoice[] = [];
-let audioEl: HTMLAudioElement | null = null;
-let serverDownUntil = 0; // server TTS ishlamasa 2 daqiqa brauzerga o'tamiz
-
-export function ttsAvailable() {
-  return typeof window !== 'undefined' && ('speechSynthesis' in window || 'Audio' in window);
-}
-
-function loadVoices(): Promise<SpeechSynthesisVoice[]> {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return resolve([]);
-    const v = window.speechSynthesis.getVoices();
-    if (v.length) { voicesCache = v; return resolve(v); }
-    const t = setTimeout(() => resolve(window.speechSynthesis.getVoices()), 800);
-    window.speechSynthesis.onvoiceschanged = () => { clearTimeout(t); voicesCache = window.speechSynthesis.getVoices(); resolve(voicesCache); };
+let sequence = 0;
+let cancelActive: (() => void) | null = null;
+export function ttsAvailable() { return typeof window !== 'undefined' && ('speechSynthesis' in window || 'Audio' in window); }
+async function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
+  const synth = window.speechSynthesis;
+  if (synth.getVoices().length) return synth.getVoices();
+  return new Promise(resolve => {
+    const finish = () => { clearTimeout(timer); synth.removeEventListener('voiceschanged', finish); resolve(synth.getVoices()); };
+    const timer = setTimeout(finish, 1200);
+    synth.addEventListener('voiceschanged', finish);
   });
 }
-
-/** Brauzerdagi eng sifatli turkcha ovoz: Natural/Online (Edge) > Google > Yelda (Apple) > boshqa */
+export async function listTurkishVoices() { return (await loadVoices()).filter(v => /^tr(?:[-_]|$)/i.test(v.lang)); }
 export async function turkishVoice(preferredName?: string) {
-  const voices = voicesCache.length ? voicesCache : await loadVoices();
-  if (preferredName) { const p = voices.find((v) => v.name === preferredName); if (p) return p; }
-  const tr = voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith('tr'));
-  const score = (v: SpeechSynthesisVoice) => (/natural|online|neural/i.test(v.name) ? 5 : 0) + (/google/i.test(v.name) ? 4 : 0) + (/yelda|emel|ahmet|tolga|filiz/i.test(v.name) ? 3 : 0) + (v.localService ? 0 : 1);
-  return tr.sort((a, b) => score(b) - score(a))[0] ?? null;
+  const voices = await listTurkishVoices();
+  return voices.find(v => v.name === preferredName) ?? voices.sort((a,b) => voiceScore(b) - voiceScore(a))[0] ?? null;
 }
-
-export async function listTurkishVoices() {
-  const voices = voicesCache.length ? voicesCache : await loadVoices();
-  return voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith('tr'));
-}
-
-function browserSpeak(text: string, rate: number, voiceName?: string): Promise<boolean> {
-  return new Promise(async (resolve) => {
-    if (!('speechSynthesis' in window)) return resolve(false);
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'tr-TR'; u.rate = rate;
-    const v = await turkishVoice(voiceName);
-    if (v) u.voice = v;
-    u.onend = () => resolve(true); u.onerror = () => resolve(false);
-    synth.speak(u);
-  });
-}
-
+function voiceScore(v: SpeechSynthesisVoice) { return (/natural|neural|online/i.test(v.name) ? 5 : 0) + (/google/i.test(v.name) ? 4 : 0); }
 export function ttsUrl(text: string, voice: Exclude<VoicePref, 'browser'> = 'emel', slow = false) {
-  return `/api/tts?text=${encodeURIComponent(text)}&voice=${voice}&rate=${slow ? 'slow' : 'normal'}`;
+  return `/api/tts?v=2&text=${encodeURIComponent(text)}&voice=${voice}&rate=${slow ? 'slow' : 'normal'}`;
 }
-
-function playUrl(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      if (audioEl) { audioEl.pause(); audioEl.src = ''; }
-      const a = new Audio(url);
-      audioEl = a;
-      let settled = false;
-      const ok = (v: boolean) => { if (!settled) { settled = true; resolve(v); } };
-      a.onended = () => ok(true);
-      a.onerror = () => ok(false);
-      a.onstalled = () => setTimeout(() => { if (a.readyState < 2) ok(false); }, 4000);
-      a.play().catch(() => ok(false));
-      setTimeout(() => { if (a.readyState < 2) ok(false); }, 8000);
-    } catch { resolve(false); }
+function playUrl(url: string, token: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const a = new Audio(url);
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return; settled = true; clearTimeout(timer);
+      a.onended = null; a.onerror = null; a.onplaying = null;
+      a.pause(); a.removeAttribute('src'); a.load();
+      if (cancelActive === cancel) cancelActive = null;
+      resolve(ok && token === sequence);
+    };
+    const cancel = () => finish(false);
+    let timer = setTimeout(() => finish(false), 22_000);
+    cancelActive = cancel;
+    a.onplaying = () => { clearTimeout(timer); timer = setTimeout(() => finish(false), 90_000); };
+    a.onended = () => finish(true); a.onerror = () => finish(false);
+    a.play().catch(() => finish(false));
   });
 }
-
-/** Asosiy funksiya: text ni turkcha o'qish. opts.rate 0.6 = sekin. */
+async function browserSpeak(text: string, rate: number, token: number, name?: string): Promise<boolean> {
+  const voice = await turkishVoice(name);
+  // Turkcha ovoz bo'lmasa inglizcha/ruscha ovozda noto'g'ri o'qimang.
+  if (!voice || token !== sequence) return false;
+  return new Promise(resolve => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'tr-TR'; u.voice = voice; u.rate = Math.max(0.55, Math.min(1.15, rate));
+    let done = false;
+    const finish = (ok: boolean) => { if (done) return; done = true; clearTimeout(timer); if (cancelActive === cancel) cancelActive = null; resolve(ok && token === sequence); };
+    const cancel = () => { finish(false); window.speechSynthesis.cancel(); };
+    const timer = setTimeout(cancel, 90_000); cancelActive = cancel;
+    u.onend = () => finish(true); u.onerror = () => finish(false);
+    window.speechSynthesis.speak(u);
+  });
+}
 export async function speak(text: string, opts: { rate?: number; voiceName?: string } = {}): Promise<boolean> {
   if (typeof window === 'undefined' || !text.trim()) return false;
+  stopSpeech(); const token = sequence;
   const pref = getVoicePref();
-  const slow = (opts.rate ?? 0.9) < 0.75;
-  if (pref !== 'browser' && Date.now() > serverDownUntil) {
-    const ok = await playUrl(ttsUrl(text, pref, slow));
-    if (ok) return true;
-    serverDownUntil = Date.now() + 120_000; // server TTS ishlamadi — vaqtincha brauzer
+  // Uzun matnni jim kesish o'rniga so'z chegarasida bo'lib o'qiymiz.
+  const chunks = text.normalize('NFC').trim().match(/.{1,350}(?:\s|$)|\S{1,350}/gu) ?? [];
+  for (const chunk of chunks) {
+    if (token !== sequence) return false;
+    let ok = false;
+    if (pref !== 'browser') ok = await playUrl(ttsUrl(chunk.trim(), pref, (opts.rate ?? 0.9) < 0.75), token);
+    if (token !== sequence) return false;
+    if (!ok) ok = await browserSpeak(chunk.trim(), opts.rate ?? 0.9, token, opts.voiceName);
+    if (!ok) return false;
   }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-  return browserSpeak(text, opts.rate ?? 0.9, opts.voiceName);
+  return true;
 }
-
-/** Oldindan yuklash (keyingi so'z tez eshitilsin) */
 export function prefetchSpeech(text: string) {
-  const pref = getVoicePref();
-  if (pref === 'browser' || typeof window === 'undefined') return;
-  try { const a = new Audio(); a.preload = 'auto'; a.src = ttsUrl(text, pref); } catch { /* noop */ }
+  if (typeof window === 'undefined' || getVoicePref() === 'browser' || text.length > 400) return;
+  fetch(ttsUrl(text, getVoicePref() as 'emel' | 'ahmet'), { signal: AbortSignal.timeout(20_000) }).catch(() => {});
 }
-
 export function stopSpeech() {
-  if (audioEl) { audioEl.pause(); }
+  sequence++; cancelActive?.(); cancelActive = null;
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 

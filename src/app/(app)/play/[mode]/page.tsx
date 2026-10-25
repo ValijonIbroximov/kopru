@@ -55,7 +55,7 @@ const CONFIG: Record<string, Cfg> = {
   review: {
     title: { uz: 'Takrorlash', tr: 'Tekrar' }, icon: '🧠', desc: { uz: 'FSRS algoritmi unutish arafasidagi so‘zlarni tanlab beradi. Har kuni 5 daqiqa — va so‘zlar abadiy qoladi.', tr: 'FSRS algoritması unutulmak üzere olan kelimeleri seçer. Her gün 5 dakika — kelimeler kalıcı olur.' },
     tips: [{ uz: 'Tez javob = "Oson" bahosi → so‘z uzoqroq muddatga ketadi', tr: 'Hızlı cevap = "Kolay" → kelime daha uzun süre sonra döner' }, { uz: 'Xato = so‘z 5 daqiqadan keyin qaytadi', tr: 'Hata = kelime 5 dakika sonra döner' }], bonus: 10,
-    build: async (c) => { const due = await fetchDue(c.settings.srs.max_reviews_per_session, c.settings.srs.max_new_per_day); const ws = due.map((d) => d.word); return buildReviewSession(ws.length ? ws : shuffle(c.words).slice(0, 12), c.words.length >= 12 ? c.words : c.allWords, c.settings.srs.max_reviews_per_session); },
+    build: async (c) => { const due = await fetchDue(c.settings.srs.max_reviews_per_session, 0); const ws = due.map((d) => d.word); return buildReviewSession(ws.length ? ws : shuffle(c.words).slice(0, 12), c.words, c.settings.srs.max_reviews_per_session); },
   },
   match: {
     title: { uz: 'Juftlash', tr: 'Eşleştirme' }, icon: '🔗', desc: { uz: 'Turkcha so‘zni o‘zbekcha juftiga ulang. 4 raund, tez va yengil.', tr: 'Türkçe kelimeyi Özbekçe eşine bağlayın. 4 tur, hızlı ve hafif.' },
@@ -70,7 +70,7 @@ const CONFIG: Record<string, Cfg> = {
   harmony: {
     title: { uz: 'Uyg‘unlik', tr: 'Ünlü uyumu' }, icon: '🎼', desc: { uz: 'Unli uyg‘unligi refleksi: so‘zga to‘g‘ri qo‘shimchani tanlang. 12 ta zarba.', tr: 'Ünlü uyumu refleksi: kelimeye doğru eki seçin. 12 vuruş.' },
     tips: [{ uz: 'Qalin: a ı o u → -lar/-da; ingichka: e i ö ü → -ler/-de', tr: 'Kalın: a ı o u → -lar/-da; ince: e i ö ü → -ler/-de' }], bonus: 10,
-    build: (c) => buildHarmonySession(harmonyEligible(c.words).length >= 8 ? c.words : c.allWords, 12),
+    build: (c) => buildHarmonySession(c.words, 12),
   },
   listen: {
     title: { uz: 'Tinglash', tr: 'Dinleme' }, icon: '🎧', desc: { uz: 'Neyron turkcha ovoz bilan eshiting: tanlang yoki yozing. Sekin rejim (🐢) ham bor.', tr: 'Nöral Türkçe sesle dinleyin: seçin ya da yazın. Yavaş mod (🐢) da var.' },
@@ -85,7 +85,7 @@ const CONFIG: Record<string, Cfg> = {
   grammar: {
     title: { uz: 'Grammatika drillari', tr: 'Dil bilgisi alıştırmaları' }, icon: '📐', desc: { uz: 'Barcha o‘tilgan qoidalar bo‘yicha aralash bo‘sh joy to‘ldirish. Har xato — izoh bilan.', tr: 'Tüm işlenen kurallardan karışık boşluk doldurma. Her hata — açıklamalı.' },
     tips: [], bonus: 10,
-    build: (c) => buildGrammarSession(c.grammar, 14),
+    build: (c) => buildGrammarSession(c.grammar.filter(g => c.progress.some(p => p.lesson_id === g.lesson_id && p.status === 'completed')), 14),
   },
   cognates: {
     title: { uz: 'Qarindosh so‘zlar', tr: 'Akraba kelimeler' }, icon: '🪢', desc: { uz: 'Siz allaqachon bilgan so‘zlar: o‘zbek–turk tovush mosliklari orqali so‘z boyligi 2 barobar. Yolg‘on do‘stlarga diqqat!', tr: 'Zaten bildiğiniz kelimeler: Özbekçe–Türkçe ses eşleşmeleriyle kelime dağarcığı 2 kat. Yalancı eşdeğerlere dikkat!' },
@@ -95,7 +95,8 @@ const CONFIG: Record<string, Cfg> = {
       const ff = cg.filter((w) => w.false_friend);
       const pick = shuffle(cg.filter((w) => !w.false_friend)).slice(0, 8).concat(shuffle(ff).slice(0, 4));
       const ex: Exercise[] = [];
-      for (const w of shuffle(pick)) { if (w.false_friend) ex.push(intro(w), trueFalseExercise(w, c.allWords)); else ex.push(choiceTrToUz(w, c.allWords)); }
+      for (const w of pick) ex.push(intro(w));
+      for (const w of shuffle(pick)) ex.push(w.false_friend ? trueFalseExercise(w, pick) : choiceTrToUz(w, pick));
       ex.push(...shuffle(pick).slice(0, 3).map((w) => typingUzToTr(w)));
       return ex;
     },

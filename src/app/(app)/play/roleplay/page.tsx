@@ -16,7 +16,7 @@ const HOWTO = [
 interface Scene { lesson: Lesson; lines: DialogLine[] }
 
 function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => void }) {
-  const scenes = useMemo<Scene[]>(() => shuffle(data.lessons.filter((l) => l.content?.dialog && l.content.dialog.length >= 4).map((l) => ({ lesson: l, lines: l.content.dialog! }))), [data]);
+  const scenes = useMemo<Scene[]>(() => shuffle(data.lessons.filter((l) => data.progress.some(p => p.lesson_id === l.id && p.status === 'completed') && l.content?.dialog && l.content.dialog.length >= 4).map((l) => ({ lesson: l, lines: l.content.dialog! }))), [data]);
   const allB = useMemo(() => scenes.flatMap((s) => s.lines.filter((l) => l.who === 'B')), [scenes]);
   const [si, setSi] = useState(0);
   const [li, setLi] = useState(0);         // joriy A satri indeksi (B javobi li+1)
@@ -43,7 +43,7 @@ function RolePlay({ data, onEnd }: { data: GameData; onEnd: (r: GameResult) => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [si, li]);
 
-  if (!scene) return <div className="card p-6 text-center text-ink-300">{l({ uz: 'Dialogli darslar topilmadi. Admin → Kontent → Darslar → content.dialog qo‘shing.', tr: 'Diyaloglu ders bulunamadı. Yönetici → İçerik → Dersler → content.dialog ekleyin.' })}</div>;
+  if (!scene) return <div className="card p-6 text-center text-ink-300">{l({ uz: 'Avval O‘rganish bo‘limidagi dialogli darsni tugating. Bu yerda faqat o‘tilgan dialoglar chiqadi.', tr: 'Önce bir diyalog dersini tamamlayın. Burada yalnızca tamamlanan diyaloglar görünür.' })}</div>;
   const correctLine = scene.lines[li + 1];
 
   function choose(o: DialogLine) {

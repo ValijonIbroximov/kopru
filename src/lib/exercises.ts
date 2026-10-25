@@ -149,7 +149,8 @@ export interface LessonSessionOpts {
 
 /** Dars sessiyasi: tanishtirish → tanib olish → tinglash → eslash → yozish → jumla → grammatika → gapirish */
 export function buildLessonSession(o: LessonSessionOpts): Exercise[] {
-  const pool = o.pool.length >= 8 ? o.pool : [...o.pool, ...o.newWords];
+  const introduced = new Map(o.pool.map(w => [w.id, w]));
+  let pool = [...introduced.values()];
   // newWords allaqachon tartiblangan (ko'rilmaganlar birinchi) — sessiyaga 8 ta so'z
   const words = o.newWords.slice(0, 8);
   const ex: Exercise[] = [];
@@ -158,7 +159,8 @@ export function buildLessonSession(o: LessonSessionOpts): Exercise[] {
 
   for (const chunk of chunks) {
     // 1) tanishtirish
-    for (const w of chunk) ex.push(intro(w));
+    for (const w of chunk) { ex.push(intro(w)); introduced.set(w.id, w); }
+    pool = [...introduced.values()];
     // 2) tanib olish (tr→uz)
     for (const w of shuffle(chunk)) ex.push(choiceTrToUz(w, pool));
     // 3) match

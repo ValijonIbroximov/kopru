@@ -12,7 +12,7 @@ import ThemeBackground from './visual/ThemeBackground';
 import NotificationBell, { NotificationsProvider } from './social/NotificationBell';
 import { LangProvider, useLang, LangSwitch, type Lang } from '@/lib/i18n';
 import { applyTheme, currentThemeId, DEFAULT_THEME, type Ambient } from '@/lib/themes';
-import { setVoicePref, type VoicePref } from '@/lib/speech';
+import { stopSpeech, setVoicePref, type VoicePref } from '@/lib/speech';
 
 export const BRAND = 'TezBil';
 export const AUTHOR = '© VALIJON IBROXIMOV';
@@ -25,18 +25,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const router = useRouter();
 
   const refresh = useCallback(async () => {
-    const [p, s] = await Promise.all([fetchProfile(), fetchSettings()]);
-    setProfile(p); setSettings(s); setLoading(false);
-    if (!p && !isLocal()) router.replace('/login');
+    setLoadError(false);
+    try {
+      const [p, s] = await Promise.all([fetchProfile(), fetchSettings()]);
+      setProfile(p); setSettings(s);
+      if (!p && !isLocal()) router.replace('/login');
+    } catch { setLoadError(true); } finally { setLoading(false); }
   }, [router]);
   useEffect(() => { refresh(); }, [refresh]);
 
   // Jonli mavzu / fon holati: profil sozlamalaridan yoki jonli oldindan ko'rishdan (onboarding, profil)
   const [themeId, setThemeId] = useState<string>(DEFAULT_THEME);
-  const [ambient, setAmbient] = useState<Ambient>('full');
+  const [ambient, setAmbient] = useState<Ambient>('lite');
   useEffect(() => {
     setThemeId(currentThemeId());
     try { const a = localStorage.getItem('tezbil.ambient') as Ambient | null; if (a) setAmbient(a); } catch { /* noop */ }
@@ -69,7 +73,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <LangProvider initial={ps.lang} onChange={onLang}>
         <ToastProvider>
           <NotificationsProvider userId={profile?.id ?? null}>
-            <Shell profile={profile} loading={loading} themeId={themeId} ambient={ambient}>{children}</Shell>
+            <Shell profile={profile} loading={loading} themeId={themeId} ambient={ambient}>{loadError ? <div role="alert" className="card p-6">Ma’lumot yuklanmadi.<button className="btn-secondary mt-3" onClick={() => refresh()}>Qayta urinish</button></div> : children}</Shell>
           </NotificationsProvider>
         </ToastProvider>
       </LangProvider>
@@ -79,6 +83,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 function Shell({ children, profile, loading, themeId, ambient }: { children: React.ReactNode; profile: Profile | null; loading: boolean; themeId: string; ambient: Ambient }) {
   const pathname = usePathname();
+  useEffect(() => { stopSpeech(); }, [pathname]);
   const router = useRouter();
   const { t } = useLang();
   const [scrolled, setScrolled] = useState(false);
@@ -96,6 +101,7 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
     { href: '/stats', label: t('stats'), icon: BarChart3, tour: 'nav-stats' },
   ];
   const SIDE_EXTRA = [
+    { href: '/coach', label: 'Shaxsiy murabbiy', icon: BookOpen },
     { href: '/plan', label: t('plan'), icon: CalendarCheck },
     { href: '/leaderboard', label: t('leaderboard'), icon: Trophy },
     { href: '/club', label: t('club'), icon: Landmark },
@@ -107,11 +113,12 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
 
   return (
     <>
-      <ThemeBackground themeId={themeId} ambient={ambient} />
+      <a href="#main-content" className="skip-link">Asosiy mazmunga o‘tish</a>
+      <ThemeBackground themeId={themeId} ambient={inSession ? 'lite' : ambient} />
       <div className="mx-auto flex min-h-screen max-w-6xl">
         <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-white/[0.06] bg-ink-950/50 p-4 backdrop-blur-sm md:flex">
           <div className="mb-5 flex items-center justify-between px-2">
-            <Link href="/dashboard" className="flex items-center gap-2 font-display text-xl font-bold"><Logo /> {BRAND}</Link>
+            <Link href="/" aria-label="Bosh sahifa" className="flex items-center gap-2 font-display text-xl font-bold"><Logo /> {BRAND}</Link>
             {profile && <NotificationBell />}
           </div>
           <nav className="space-y-1">
@@ -147,7 +154,7 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
         <div className="flex min-w-0 flex-1 flex-col">
           {!inSession && (
             <header className={cn('sticky top-0 z-30 flex items-center justify-between px-4 py-3 transition-all md:hidden', scrolled ? 'glass border-b border-white/[0.08] shadow-card' : 'bg-transparent')}>
-              <Link href="/dashboard" className="flex items-center gap-2 font-display text-lg font-bold"><Logo small /> {BRAND}</Link>
+              <Link href="/" aria-label="Bosh sahifa" className="flex items-center gap-2 font-display text-lg font-bold"><Logo small /> {BRAND}</Link>
               {profile && (
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="chip">🔥 {profile.streak}</span>
@@ -159,7 +166,7 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
               )}
             </header>
           )}
-          <main className={cn('flex-1 px-4 py-5 sm:px-6', !inSession && 'pb-24 md:pb-8')}>{children}</main>
+          <main id="main-content" className={cn('flex-1 px-4 py-5 sm:px-6', !inSession && 'pb-24 md:pb-8')}>{children}</main>
           {!inSession && (
             <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-white/[0.06] glass px-1 pb-[env(safe-area-inset-bottom)] md:hidden">
               {NAV.map((n) => {

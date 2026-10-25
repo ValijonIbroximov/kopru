@@ -2,8 +2,9 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Exercise, GrammarTopic, Lesson, SessionSummary, Word, ListenExercise, OrderExercise, ChoiceExercise } from '@/lib/types';
-import { fetchLesson, fetchWords, fetchGrammar, fetchDue, fetchActiveSession, fetchLessons, markLessonStarted, fetchUserWords } from '@/lib/data';
+import { fetchLesson, fetchWords, fetchGrammar, fetchDue, fetchActiveSession, fetchLessons, markLessonStarted, fetchUserWords, fetchLessonProgress } from '@/lib/data';
 import { buildLessonSession, buildBossSession, buildGrammarSession, buildHarmonySession, choiceTrToUz, listenExercise, intro, speakExercise } from '@/lib/exercises';
+import { learnedWords } from '@/lib/wordpool';
 import { SOUND_MAP } from '@/lib/turkish';
 import ExerciseRunner, { type RunnerState } from '@/components/exercises/ExerciseRunner';
 import SessionEnd from '@/components/exercises/SessionEnd';
@@ -29,26 +30,28 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [summary, setSummary] = useState<{ s: SessionSummary; id: string | null } | null>(null);
   const [tab, setTab] = useState(0);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     (async () => {
-      const [l, all, g, due, active, lessons, uw] = await Promise.all([fetchLesson(lessonId), fetchWords(), fetchGrammar(), fetchDue(8, 0), fetchActiveSession('lesson', lessonId), fetchLessons(), fetchUserWords()]);
-      if (!l) return;
+      const [l, all, g, due, active, lessons, uw, progress] = await Promise.all([fetchLesson(lessonId), fetchWords(), fetchGrammar(), fetchDue(8, 0), fetchActiveSession('lesson', lessonId), fetchLessons(), fetchUserWords(), fetchLessonProgress()]);
+      if (!l) { setLoadError('Dars topilmadi.'); return; }
       setLesson(l);
-      setPool(all);
+      const known = learnedWords(all, progress, uw);
+      setPool(known);
       // ko'rilmagan so'zlar birinchi — har sessiyada yangi so'zlar keladi
       const seen = new Set(uw.map((x) => x.word_id));
       const mine = all.filter((w) => w.lesson_id === lessonId);
       setWords([...shuffle(mine.filter((w) => !seen.has(w.id))), ...shuffle(mine.filter((w) => seen.has(w.id)))]);
       setGrammar(g.filter((x) => x.lesson_id === lessonId));
       setReviewWords(due.map((d) => d.word));
-      const unitLessonIds = new Set(lessons.filter((x) => x.unit_id === l.unit_id).map((x) => x.id));
-      setUnitWords(all.filter((w) => w.lesson_id && unitLessonIds.has(w.lesson_id)));
+      const unitLessonIds = new Set(lessons.filter((x) => x.unit_id === l.unit_id && (x.id === lessonId || progress.some(p => p.lesson_id === x.id && p.status === 'completed'))).map((x) => x.id));
+      setUnitWords(known.filter((w) => w.lesson_id && unitLessonIds.has(w.lesson_id)));
       setUnitGrammar(g.filter((x) => x.lesson_id && unitLessonIds.has(x.lesson_id)));
       const st = active?.state as RunnerState | undefined;
       if (active && st && Array.isArray(st.queue) && st.index < st.queue.length) setResume({ id: active.id, state: st });
       setPhase('intro');
-    })();
+    })().catch(() => setLoadError('Dars yuklanmadi. Internetni tekshirib qayta oching.'));
   }, [lessonId]);
 
   const dialogExercises = useMemo((): Exercise[] => {
@@ -105,6 +108,7 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
     setPhase('running');
   };
 
+  if (loadError) return <div role="alert" className="card p-6">{loadError}<Link href="/learn" className="btn-secondary mt-4">Darslarga qaytish</Link></div>;
   if (phase === 'loading' || !lesson) return <div className="mx-auto max-w-xl space-y-3"><Skeleton className="h-10 w-2/3" /><Skeleton className="h-64" /></div>;
 
   if (phase === 'done' && summary) {

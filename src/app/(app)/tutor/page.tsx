@@ -24,12 +24,16 @@ const SCENARIOS = [
   { id: 'ish', t: { uz: '💼 Ish suhbati', tr: '💼 İş görüşmesi' }, s: 'Oddiy ish suhbati (A2)', sl: { uz: 'Oddiy ish suhbati (A2)', tr: 'Basit iş görüşmesi (A2)' } },
   { id: 'erkin', t: { uz: '💬 Erkin suhbat', tr: '💬 Serbest sohbet' }, s: 'erkin suhbat', sl: { uz: 'erkin suhbat', tr: 'serbest sohbet' } },
 ];
-const KEY = 'kopru.tutor.v1';
+const KEY = 'kopru.tutor.v2';
 
 export default function TutorPage() {
   const { profile, settings } = useProfile();
   const { push } = useToast();
   const { l, t } = useLang();
+  const [hydratedKey, setHydratedKey] = useState('');
+  const sending = useRef(false);
+  const generation = useRef(0);
+  const historyKey = `${KEY}:${profile?.id ?? 'local'}`;
   const [scenario, setScenario] = useState(SCENARIOS[0]);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -40,17 +44,30 @@ export default function TutorPage() {
   const bottom = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) { const s = JSON.parse(r); setMsgs(s.msgs ?? []); setTurns(s.turns ?? 0); const sc = SCENARIOS.find((x) => x.id === s.scenario); if (sc) setScenario(sc); } } catch { /* noop */ } }, []);
-  useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify({ msgs: msgs.slice(-24), turns, scenario: scenario.id })); } catch { /* noop */ } bottom.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs, turns, scenario]);
+  useEffect(() => {
+    if (!profile) return;
+    generation.current++; sending.current = false; setBusy(false); setHydratedKey(''); setMsgs([]); setTurns(0);
+    try { const raw = localStorage.getItem(historyKey); if (raw) { const v = JSON.parse(raw); if (Array.isArray(v.msgs)) setMsgs(v.msgs.filter((m: Msg) => m && typeof m.content === 'string' && ['user','assistant'].includes(m.role)).slice(-24)); setTurns(v.day === new Date().toISOString().slice(0,10) ? Number(v.turns) || 0 : 0); const sc = SCENARIOS.find(x => x.id === v.scenario); if (sc) setScenario(sc); } } catch { /* damaged local history */ }
+    setHydratedKey(historyKey);
+  }, [historyKey, profile?.id]);
+  useEffect(() => {
+    if (hydratedKey !== historyKey) return;
+    try { localStorage.setItem(historyKey, JSON.stringify({ msgs: msgs.slice(-24), turns, scenario: scenario.id, day: new Date().toISOString().slice(0,10) })); } catch { /* storage unavailable */ }
+    bottom.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+  }, [msgs, turns, scenario, hydratedKey, historyKey]);
+
+  useEffect(() => () => { generation.current++; }, []);
 
   async function send(text?: string) {
     const body = (text ?? input).trim();
-    if (!body || busy) return;
+    if (!body || sending.current || hydratedKey !== historyKey) return;
+    sending.current = true; const requestGeneration = generation.current;
     setInput(''); setFail(null);
     const next: Msg[] = [...msgs, { role: 'user', content: body }];
     setMsgs(next); setBusy(true);
     const res = await callAi<TutorReply>('tutor', { level: profile?.level_cefr ?? 'A1', scenario: scenario.s, messages: next.map((m) => ({ role: m.role, content: m.content })) });
-    setBusy(false);
+    if (requestGeneration !== generation.current) return;
+    sending.current = false; setBusy(false);
     if (res.ok) {
       setMsgs([...next, { role: 'assistant', content: res.data.reply_tr, data: res.data }]);
       const nt = turns + 1; setTurns(nt);
@@ -68,8 +85,9 @@ export default function TutorPage() {
     <div className="mx-auto flex max-w-2xl flex-col" style={{ minHeight: 'calc(100vh - 9rem)' }}>
       <PageHeader title={`🤖 ${t('tutor')}`} sub={l({ uz: `Turkcha yozing (xato bo‘lsa ham!). Tuzatadi, tarjima qiladi, savol beradi. Har xabar +${settings.xp.tutor_turn} XP (kuniga ${settings.ai.tutor_max_turns} tagacha).`, tr: `Türkçe yazın (hatalı olsa da!). Düzeltir, çevirir, soru sorar. Her mesaj +${settings.xp.tutor_turn} XP (günde en fazla ${settings.ai.tutor_max_turns}).` })}
         right={<button className="chip" onClick={() => setShowUz(!showUz)}>{showUz ? l({ uz: 'UZ: yoqilgan', tr: 'UZ: açık' }) : l({ uz: 'UZ: o‘chiq', tr: 'UZ: kapalı' })}</button>} />
+      <div className="mb-4 rounded-2xl border border-teal-400/20 bg-teal-500/10 p-4 text-sm"><b>Shaxsiy murabbiy</b><p className="mt-1 text-ink-300">Suhbat o‘rganilgan so‘zlaringiz va xatolaringizga moslanadi. Faqat tanish so‘zlardan aniq mashq uchun:</p><Link href="/coach" className="mt-2 inline-flex text-teal-300 underline">5 daqiqalik shaxsiy mashq →</Link></div>
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {SCENARIOS.map((s) => <button key={s.id} onClick={() => { setScenario(s); setMsgs([]); }} className={cn('chip shrink-0 py-1.5 text-sm', scenario.id === s.id && 'border-fuchsia-400 bg-fuchsia-500/20 text-white')}>{l(s.t)}</button>)}
+        {SCENARIOS.map((s) => <button key={s.id} disabled={busy} onClick={() => { setScenario(s); setMsgs([]); }} className={cn('chip shrink-0 py-1.5 text-sm', scenario.id === s.id && 'border-fuchsia-400 bg-fuchsia-500/20 text-white')}>{l(s.t)}</button>)}
       </div>
 
       <div className="card flex-1 space-y-3 overflow-y-auto p-4">
@@ -111,12 +129,12 @@ export default function TutorPage() {
       </div>
 
       <div className="sticky bottom-0 mt-3 rounded-2xl border border-white/10 bg-ink-900 p-2">
-        <textarea ref={ref} className="input resize-none py-2" rows={2} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Türkçe yazın…" disabled={isLocal()}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
+        <textarea aria-label="Turkcha xabar" maxLength={2000} ref={ref} className="input resize-none py-2" rows={2} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Türkçe yazın…" disabled={isLocal()}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }} />
         <div className="mt-2 flex items-center justify-between gap-2">
           <TurkishKeys onInsert={insert} />
           <div className="flex gap-1">
-            <button className="btn-ghost px-2 py-1 text-xs" onClick={() => { setMsgs([]); setTurns(0); }}>{l({ uz: 'Tozalash', tr: 'Temizle' })}</button>
+            <button disabled={busy} className="btn-ghost px-2 py-1 text-xs" onClick={() => { setMsgs([]); }}>{l({ uz: 'Tozalash', tr: 'Temizle' })}</button>
             <button className="btn-primary px-3 py-2" onClick={() => send()} disabled={busy || !input.trim()}><Send size={16} /></button>
           </div>
         </div>

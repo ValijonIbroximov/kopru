@@ -43,7 +43,7 @@ function LandingInner() {
       <ScrollProgress />
       <ThemeBackground themeId={theme} />
       <nav className="sticky top-0 z-30 mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-        <div className="glass rounded-2xl px-3 py-2"><Logo /></div>
+        <Link href="/" aria-label="Bosh sahifa" className="glass rounded-2xl px-3 py-2"><Logo /></Link>
         <div className="flex items-center gap-2"><LangSwitch className="glass rounded-full" /><Link href="/login?demo=1" className="btn-ghost glass hidden sm:inline-flex">Demo</Link><Link href="/login" className="btn-primary">{t('login')}</Link></div>
       </nav>
 

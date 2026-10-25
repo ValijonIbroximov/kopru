@@ -115,3 +115,10 @@ html[data-mode="light"] .shadow-card { box-shadow: 0 10px 30px -18px rgb(var(--o
 .tilt { transition: transform .25s ease, box-shadow .25s ease; }
 .tilt:hover { transform: translateY(-3px) rotate(-.4deg); box-shadow: 0 18px 40px -18px rgba(255,106,42,.45); }
 .coach-hole { box-shadow: 0 0 0 9999px rgb(var(--overlay) / .78), 0 0 0 4px rgb(var(--accent) / .9); border-radius: 18px; }
+
+/* Focus, touch targets and low-motion accessibility. */
+:where(a,button,input,textarea,select,summary):focus-visible { outline: 2px solid #2dd4bf; outline-offset: 4px; }
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; background: #0f766e; color: white; padding: 12px 20px; border-radius: 12px; }
+.skip-link:focus { top: 12px; }
+button, a { touch-action: manipulation; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

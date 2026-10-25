@@ -1,0 +1,153 @@
+{
+  "base_commit": "b52d924f9fb9ee475477b2a08742901c380af71a",
+  "files": [
+    {
+      "path": ".env.example",
+      "sha256": "42ecf78499449b148e074967f27f585775ad248c6e4dcbe60382ede0000715ca"
+    },
+    {
+      "path": "UPDATE-4-UZ.md",
+      "sha256": "630b4b7f5a809cd1b38f979e8b93203831f168ba3dfa0ddf0eff612f1ba54a0a"
+    },
+    {
+      "path": "src/app/(app)/coach/page.tsx",
+      "sha256": "15e485f4b1980ce7032c3ff0c30778fc10a53058c9f8c6ac0570673c83cf534f"
+    },
+    {
+      "path": "src/app/(app)/dashboard/page.tsx",
+      "sha256": "1a5688ad4cf0740ce0a336ca0ea2fa3a2cc1e188d40f4be4dab35fefde47f46b"
+    },
+    {
+      "path": "src/app/(app)/friends/page.tsx",
+      "sha256": "ac1c723787bd9832aa841099f81520b75fb21a1043d84a14cd1caadc8fc531eb"
+    },
+    {
+      "path": "src/app/(app)/learn/[id]/page.tsx",
+      "sha256": "ba3868efb135f464ce17a2fbd87c967e9d47a1bd1cf454214d50adf150e3c7da"
+    },
+    {
+      "path": "src/app/(app)/loading.tsx",
+      "sha256": "7adb56e72c2585c60f948d3967ffe62c951c5a694a0cba6ea1ad0c5d414ccdca"
+    },
+    {
+      "path": "src/app/(app)/onboarding/page.tsx",
+      "sha256": "1e0017e9037b806d31e07a6f04bc45eed3b2f64bc290668b16f8ba945b2f3160"
+    },
+    {
+      "path": "src/app/(app)/play/[mode]/page.tsx",
+      "sha256": "905a78dbc64fbaf6ff87f5cbf5bb41fd716796d8aa478e0d8db750c98dfb8562"
+    },
+    {
+      "path": "src/app/(app)/play/roleplay/page.tsx",
+      "sha256": "89719ef7effb2730c65724ecf94e6611972394298151b387cc6706c42977a59e"
+    },
+    {
+      "path": "src/app/(app)/tutor/page.tsx",
+      "sha256": "3fc9bd77631f87d267b6749beaf35d5f137c24824a84a03c73774351bc361d89"
+    },
+    {
+      "path": "src/app/api/ai/route.ts",
+      "sha256": "fbf6611f69d6691f4cc3bdb6a0adc44ee592f0a773706aa84b2d0edc143b3f3b"
+    },
+    {
+      "path": "src/app/api/tts/route.ts",
+      "sha256": "dbfad266cef7d6b6855c86ef388dd675c373ddc3c5ee79d7f890ce2f820b0da3"
+    },
+    {
+      "path": "src/app/globals.css",
+      "sha256": "0377ad7e8a56ca6c71a42a15bb8f38c54262fe07f7d7714d53ca2b2d21cec364"
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "sha256": "c3504e49022338bbb070f79c43149ed58fa0b8daf22f506a8a0393215eb3b5a5"
+    },
+    {
+      "path": "src/app/login/page.tsx",
+      "sha256": "f1b2b89f5fd4eb47891d3809bad35e48c4212f9f67684925c3458e84e8084a45"
+    },
+    {
+      "path": "src/app/page.tsx",
+      "sha256": "c1994019cfdfec365c453765006a28eea2da9fe1b27009459671c53e74c444da"
+    },
+    {
+      "path": "src/components/AppShell.tsx",
+      "sha256": "0836ffb5973a32a928ec11aef2ed5532f60d149389e21eeb9f650a24bf31902e"
+    },
+    {
+      "path": "src/components/VoicePicker.tsx",
+      "sha256": "60b7893acd0aa03d205391bd3db67ef7a839f2552bb027773d6616c9d4d27ef5"
+    },
+    {
+      "path": "src/components/exercises/ExerciseRunner.tsx",
+      "sha256": "9df96243fd86abe9304275562804c7b6da4723da6d56a50c2427dba4eb34f146"
+    },
+    {
+      "path": "src/components/exercises/ExerciseViews.tsx",
+      "sha256": "b3e00f127a74fd255c3ccb402b2bd5523235337d4a085b6c761571333f1dad8d"
+    },
+    {
+      "path": "src/components/visual/ThemeBackground.tsx",
+      "sha256": "f52b93aa0206ec95d4e09327f32f4af0311fa53b67d09a69d5a09e0b1c672ff3"
+    },
+    {
+      "path": "src/lib/ai/gateway.ts",
+      "sha256": "7cbe72faf1854187afcecda2eadae3c0a9c3691728cf525490eef4e0ba5b808f"
+    },
+    {
+      "path": "src/lib/ai/learner.ts",
+      "sha256": "792a9acef4a1d533f8019a8b81ed1a7fc607f464d1bbe0b59dab8285da4ae19f"
+    },
+    {
+      "path": "src/lib/ai/prompts.ts",
+      "sha256": "28b02ab7ca29e06be562ee039a8081e2df0949c616e7094a72f17948efe24ab4"
+    },
+    {
+      "path": "src/lib/ai/providers.ts",
+      "sha256": "b6d07c8306d387d173d9fe97852efe6c7a43a49fea184433a650838664e7799d"
+    },
+    {
+      "path": "src/lib/ai/validation.ts",
+      "sha256": "c8d47cd35bf76674e584b75e033bab5e1990a3a78bac47cdf4b3f2f4aa58c6d6"
+    },
+    {
+      "path": "src/lib/coach.ts",
+      "sha256": "88abab372dd4c5efe4c8875906cbc32832f83f6eb1010c07ea442b926903aa5c"
+    },
+    {
+      "path": "src/lib/content-cache.ts",
+      "sha256": "0740eb6205cb2a7412c989a94f92ef8618264e5a52ac72efb785b4f2baddcc7f"
+    },
+    {
+      "path": "src/lib/data.ts",
+      "sha256": "8f628871edb4acd4cf9b580e0a3d205fa48249966d0c2c803b28138d68340c78"
+    },
+    {
+      "path": "src/lib/exercises.ts",
+      "sha256": "422f60589db4bb4aa52cb248b30814e14b76074b34c4c6e35a38823509861ba1"
+    },
+    {
+      "path": "src/lib/review-queue.ts",
+      "sha256": "4af914ccd4c5b70c76fdf6c5644186c3547fc919f380f1e2f8128a893ffd8fbc"
+    },
+    {
+      "path": "src/lib/speech.ts",
+      "sha256": "10b951c0b2f7590a616e0fb5eee0e473b5cbf03f3cd28b97ea26217afee5f179"
+    },
+    {
+      "path": "src/lib/tts/edge.ts",
+      "sha256": "cf11fbe8189ef9dc788c07b340c56ef8b9247a3c392d44f17c37bb8a8c50bb0f"
+    },
+    {
+      "path": "src/lib/wordpool.ts",
+      "sha256": "1fccc5ab457e1a94a59fa790a0b9a8964513c857042a2574ee75d66a180f2c05"
+    },
+    {
+      "path": "src/middleware.ts",
+      "sha256": "ee0cbb5e8997c97ce1862779627d4d49efc11817604b8edab87493a8c32bf1e8"
+    },
+    {
+      "path": "tests/regression.cjs",
+      "sha256": "16a0307e7a47c7350106ffae86c17e09f87c50dd989550205adaf246fcc94105"
+    }
+  ]
+}

@@ -3,13 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Flame } from 'lucide-react';
 import type { Exercise, ExerciseResult, SessionSummary, UserWord } from '@/lib/types';
+import { createReviewQueue } from '@/lib/review-queue';
 import { cardFromRow, gradeFromResult, schedule } from '@/lib/fsrs';
 import { fetchUserWords, recordReview, saveSession, createSession } from '@/lib/data';
 import { useProfile } from '@/components/AppShell';
 import { Bar, Confetti } from '@/components/ui';
 import { ENCOURAGE, CONSOLE } from '@/lib/motivation';
 import { cn } from '@/lib/utils';
-import { speak } from '@/lib/speech';
+import { speak, stopSpeech } from '@/lib/speech';
 import { useLang } from '@/lib/i18n';
 import {
   IntroView, ChoiceView, TypingView, MatchView, OrderView, ListenView, SpeakView, HarmonyView, FillView, TrueFalseView,
@@ -47,6 +48,8 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
   const cardsRef = useRef<Map<number, UserWord>>(new Map());
   const shownAt = useRef(Date.now());
   const finishingRef = useRef(false);
+  const reviews = useRef(createReviewQueue());
+  const [saveError, setSaveError] = useState(false);
 
   const current = state.queue[state.index];
   const total = state.queue.length;
@@ -67,7 +70,7 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { shownAt.current = Date.now(); }, [state.index]);
+  useEffect(() => { shownAt.current = Date.now(); return () => stopSpeech(); }, [state.index]);
 
   const xpPerCorrect = settings.xp.correct ?? 2;
 
@@ -89,7 +92,9 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
 
     // SRS yozuvlari
     const reviewTargets: { wordId: number; correct: boolean }[] = [];
-    if (current.type === 'match' && meta?.pairResults) for (const p of meta.pairResults) if (p.wordId) reviewTargets.push({ wordId: p.wordId, correct: p.correct });
+    if (current.type === 'match' && meta?.pairResults) {
+      for (const p of meta.pairResults) if (p.wordId) reviewTargets.push({ wordId: p.wordId, correct: p.correct });
+    }
     else if (scored && current.wordId) reviewTargets.push({ wordId: current.wordId, correct });
     for (const t of reviewTargets) {
       const prev = cardsRef.current.get(t.wordId);
@@ -97,7 +102,7 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
       const grade = gradeFromResult(t.correct, responseMs, meta?.usedHint, current.type);
       const { card: next, elapsedDays } = schedule(card, grade, new Date(), settings.srs.desired_retention);
       cardsRef.current.set(t.wordId, { user_id: prev?.user_id ?? '', word_id: t.wordId, stability: next.stability, difficulty: next.difficulty, due: next.due.toISOString(), reps: next.reps, lapses: next.lapses, state: next.state, last_review: new Date().toISOString() });
-      recordReview(t.wordId, grade, t.correct, next, responseMs, mode, elapsedDays).catch(() => {});
+      reviews.current.add(() => recordReview(t.wordId, grade, t.correct, next, responseMs, mode, elapsedDays));
     }
 
     setState((s) => {
@@ -116,13 +121,15 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
     });
   }, [current, answered, combo, xpPerCorrect, settings, mode, sessionId, xp, requeueWrong]);
 
-  const next = useCallback(() => {
-    if (!current) return;
-    setAnswered(null);
+  const next = useCallback(async () => {
+    if (!current || finishingRef.current) return;
     if (state.index + 1 >= state.queue.length) {
       if (finishingRef.current) return;
       finishingRef.current = true;
       setFinished(true);
+      const failures = await reviews.current.flush(saveError);
+      if (failures) { setSaveError(true); setFinished(false); finishingRef.current = false; return; }
+      setSaveError(false);
       const scoredResults = state.results.filter((r) => r.type !== 'intro');
       const correct = scoredResults.filter((r) => r.correct).length;
       const summary: SessionSummary = {
@@ -132,8 +139,9 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
       onFinish(summary, sessionId);
       return;
     }
+    setAnswered(null);
     setState((s) => ({ ...s, index: s.index + 1 }));
-  }, [current, state, mode, xp, onFinish, sessionId]);
+  }, [current, state, mode, xp, onFinish, sessionId, saveError]);
 
   // Enter → davom etish
   useEffect(() => {
@@ -149,6 +157,7 @@ export default function ExerciseRunner({ exercises, mode, lessonId = null, title
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answered]);
 
+  if (saveError && !finished) return <div role="alert" className="card mx-auto max-w-xl space-y-3 p-6"><p>Mashq tugadi, ammo ayrim natijalar saqlanmadi. Ushbu oynani yopmay, internetni tekshirib qayta urinib ko‘ring.</p><button className="btn-primary" onClick={() => next()}>Saqlashni qayta urinish</button></div>;
   if (!current || finished) return <div className="mx-auto max-w-xl py-10 text-center text-ink-300">{t('finishing')}</div>;
 
   const view = (() => {
