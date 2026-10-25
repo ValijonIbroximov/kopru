@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { after } from 'next/server';
 import { supabaseServer, supabaseAdmin } from '@/lib/supabase/server';
 import { loadSettings } from '@/lib/settings';
-import { runAi, processQueuedJobs } from '@/lib/ai/gateway';
+import { runAi } from '@/lib/ai/gateway';
 import { learnerContext } from '@/lib/ai/learner';
 import type { AiKind } from '@/lib/types';
 
@@ -37,9 +36,6 @@ export async function POST(req: NextRequest) {
   const admin = supabaseAdmin();
   const ctx = { user: sb, admin, userId: auth.user.id, dailyUserCap: settings.ai.daily_user_cap, queueEnabled: settings.ai.queue_enabled, enabled: settings.ai.enabled };
   const res = await runAi(body.kind, payload, ctx);
-
-  // Javob yuborilgach, fursatdan foydalanib navbatdagi 1 ta ishni bajarish (piggyback worker)
-  if (res.ok && !res.cached) after(async () => { try { await processQueuedJobs(ctx, 1); } catch { /* noop */ } });
 
   return NextResponse.json(res, { status: res.ok ? 200 : res.reason === 'quota' ? 429 : res.reason === 'disabled' ? 503 : 500 });
 }

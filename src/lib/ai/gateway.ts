@@ -1,3 +1,4 @@
+import { classifyError } from './errors';
 /**
  * AI shlyuzi: provayderlar zanjiri → limit tugasa keyingisi → hammasi tugasa kesh/navbat.
  * Limit qayta tiklanganda hech narsa yo'qolmaydi: navbatdagi ishlar cron yoki keyingi
@@ -10,7 +11,7 @@ import { currentModel, configuredProviders, type ProviderDef } from './providers
 import { buildPrompt, extractJson, SYSTEM_PROMPT } from './prompts';
 import { hashString } from '@/lib/utils';
 
-interface MemState { cooldownUntil: number; errors: number; usedToday: number; day: string; lastError?: string }
+interface MemState { cooldownUntil: number; errors: number; usedToday: number; day: string; lastError?: string; reason?: 'quota' | 'error' }
 const mem = new Map<string, MemState>();
 const QUEUEABLE: AiKind[] = ['story', 'exercises', 'explain', 'translate'];
 
@@ -70,27 +71,6 @@ async function loadCandidates(admin: SupabaseClient | null, reader: SupabaseClie
     out.push({ def: c.def, key: c.key, model, cap: st?.daily_cap ?? 1000, priority: st?.priority ?? i + 1 });
   });
   return out.sort((a, b) => a.priority - b.priority);
-}
-
-function classifyError(status: number, body: string, headers: Headers): { cooldownMs: number; message: string } {
-  const lower = body.toLowerCase();
-  const retryAfter = Number(headers.get('retry-after'));
-  const m = lower.match(/try again in ([\d.]+)\s*(ms|s|m|h)/);
-  let ms = 0;
-  if (m) {
-    const v = parseFloat(m[1]);
-    ms = m[2] === 'ms' ? v : m[2] === 's' ? v * 1000 : m[2] === 'm' ? v * 60000 : v * 3600000;
-  } else if (retryAfter > 0) {
-    ms = retryAfter * 1000;
-  }
-  const daily = /per day|daily|tokens per day|requests per day|tpd|rpd|quota exceeded|resource_exhausted|exceeded your current quota/.test(lower);
-  if (status === 429 || status === 402 || daily) {
-    if (daily && ms === 0) ms = nextUtcMidnight().getTime() - Date.now();
-    return { cooldownMs: Math.max(ms, 60_000), message: `Limit (${status}): ${body.slice(0, 160)}` };
-  }
-  if (status === 401 || status === 403) return { cooldownMs: 6 * 3600_000, message: `Kalit xatosi (${status})` };
-  if (status === 404 || status === 400) return { cooldownMs: 3600_000, message: `Model/so'rov xatosi (${status}): ${body.slice(0, 160)}` };
-  return { cooldownMs: 120_000, message: `Xato (${status}): ${body.slice(0, 160)}` };
 }
 
 async function callProvider(c: Candidate, userPrompt: string, temperature: number, maxTokens: number, timeoutMs = 28_000) {
@@ -172,35 +152,39 @@ export async function callChain(kind: AiKind, payload: Record<string, unknown>, 
   const deadline = now + 40_000;
   let earliest = Infinity;
   const errors: string[] = [];
+  let failureReason: 'quota' | 'error' = 'quota';
   for (const c of candidates) {
     const m = getMem(c.def.id);
-    if (m.cooldownUntil > now) { earliest = Math.min(earliest, m.cooldownUntil); continue; }
+    if (m.cooldownUntil > now) { if (m.reason === 'error') failureReason = 'error'; earliest = Math.min(earliest, m.cooldownUntil); continue; }
     if (m.usedToday >= c.cap) { earliest = Math.min(earliest, nextUtcMidnight().getTime()); continue; }
     if (Date.now() >= deadline - 1000) break;
     const r = await callProvider(c, spec.user, spec.temperature, spec.maxTokens, Math.min(12_000, deadline - Date.now()));
     if (r.ok) {
       const data = extractJson(r.content);
       if (data === null || (kind === 'tutor' && !validTutor(data))) {
-        errors.push(`${c.def.id}: JSON o'qilmadi`);
+        failureReason = 'error';
+        errors.push('AI javobini o‘qib bo‘lmadi. Qayta urinib ko‘ring.');
         m.errors += 1;
         continue;
       }
       m.usedToday += 1;
-      m.errors = 0;
+      m.errors = 0; m.cooldownUntil = 0; m.reason = undefined;
       await persistState(ctx.admin, c.def.id, { inc: true, latency: r.latency, cooldown_until: null });
       return { ok: true, data, provider: c.def.id, cached: false };
     }
     const cls = classifyError(r.status, r.body, r.headers);
     m.errors += 1;
-    const backoff = cls.cooldownMs * Math.min(8, Math.pow(2, Math.max(0, m.errors - 1)));
+    m.reason = cls.reason;
+    if (cls.reason === 'error') failureReason = 'error';
+    const backoff = cls.cooldownMs * (cls.explicitDelay ? 1 : Math.min(8, Math.pow(2, Math.max(0, m.errors - 1))));
     m.cooldownUntil = Date.now() + Math.min(backoff, 24 * 3600_000);
-    m.lastError = cls.message;
+    m.lastError = cls.diagnostic;
     earliest = Math.min(earliest, m.cooldownUntil);
-    errors.push(`${c.def.id}: ${cls.message}`);
-    await persistState(ctx.admin, c.def.id, { err: true, cooldown_until: new Date(m.cooldownUntil).toISOString(), last_error: cls.message });
+    errors.push(cls.message);
+    await persistState(ctx.admin, c.def.id, { err: true, cooldown_until: new Date(m.cooldownUntil).toISOString(), last_error: cls.diagnostic });
   }
   const retryAt = Number.isFinite(earliest) ? new Date(earliest).toISOString() : null;
-  return { ok: false, reason: 'quota', message: errors.join(' | ') || 'Barcha provayderlar band', retryAt };
+  return { ok: false, reason: failureReason, message: errors[0] || 'AI xizmati vaqtincha band. Kutish muddati tugagach qayta urinib ko‘ring.', retryAt };
 }
 
 /** To'liq oqim: kesh → foydalanuvchi limiti → zanjir → navbat */

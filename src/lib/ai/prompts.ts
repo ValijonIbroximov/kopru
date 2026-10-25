@@ -21,7 +21,9 @@ function words(list: unknown, max = 60) {
 
 export function buildPrompt(kind: AiKind, p: Record<string, unknown>): PromptSpec {
   const level = String(p.level ?? 'A1');
-  const learner = p.learner && typeof p.learner === 'object' ? JSON.stringify(p.learner) : 'Tarix mavjud emas: boshlovchi deb qabul qil.';
+  const state = p.learner as Record<string, unknown> | undefined;
+  const context = kind === 'tutor' && state ? { level: state.level, knownCount: state.knownCount, known: Array.isArray(state.known) ? state.known.slice(0,60) : [], weak: Array.isArray(state.weak) ? state.weak.slice(0,6) : [] } : p.learner;
+  const learner = context && typeof context === 'object' ? JSON.stringify(context) : 'Tarix mavjud emas: boshlovchi deb qabul qil.';
   const learningRules = `Tasdiqlangan o'quv holati: ${learner}.
   O'rganilmagan so'zni biladi deb hisoblama. Avval tarjima va sodda misol bilan tushuntir, keyin mashq taklif qil.
   Boshlovchiga birdan ko'p savol berma. Qiyin so'zlarni weak ro'yxatidan tanla; maqsad daraja haqiqiy o'zlashtirish emas.
@@ -38,7 +40,7 @@ ${level} darajasiga mos, qiziqarli, ${p.length ?? 110} so'zli qisqa turkcha hiko
 JSON: {"title_tr":"","title_uz":"","level":"${level}","paragraphs":[{"tr":"","uz":""}],"glossary":[{"tr":"","uz":""}],"questions":[{"q":"","options":["","",""],"answer":0,"explain":""}]}`,
       };
     case 'tutor': {
-      const msgs = Array.isArray(p.messages) ? (p.messages as { role: string; content: string }[]).filter(m => m && ['user','assistant'].includes(m.role) && typeof m.content === 'string').slice(-12).map(m => ({ role: m.role, content: m.content.slice(0, 2000) })) : [];
+      const msgs = Array.isArray(p.messages) ? (p.messages as { role: string; content: string }[]).filter(m => m && ['user','assistant'].includes(m.role) && typeof m.content === 'string').slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 2000) })) : [];
       const transcript = msgs.map((m) => `${m.role === 'user' ? 'TALABA' : 'O‘QITUVCHI'}: ${m.content}`).join('\n');
       return {
         cacheable: false, temperature: 0.7, maxTokens: 700,

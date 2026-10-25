@@ -39,6 +39,10 @@ export default function TutorPage() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [fail, setFail] = useState<AiFailure | null>(null);
+  const [pending, setPending] = useState<Msg[] | null>(null);
+  const [clock, setClock] = useState(Date.now());
+  const remaining = Math.max(0, Math.ceil(((fail?.retryAt ? Date.parse(fail.retryAt) : 0) - clock) / 1000)) || 0;
+  useEffect(() => { if (!fail?.retryAt) return; const timer = setInterval(() => setClock(Date.now()), 1000); return () => clearInterval(timer); }, [fail?.retryAt]);
   const [showUz, setShowUz] = useState(true);
   const [turns, setTurns] = useState(0);
   const bottom = useRef<HTMLDivElement>(null);
@@ -46,7 +50,7 @@ export default function TutorPage() {
 
   useEffect(() => {
     if (!profile) return;
-    generation.current++; sending.current = false; setBusy(false); setHydratedKey(''); setMsgs([]); setTurns(0);
+    generation.current++; sending.current = false; setBusy(false); setHydratedKey(''); setMsgs([]); setTurns(0); setFail(null); setPending(null);
     try { const raw = localStorage.getItem(historyKey); if (raw) { const v = JSON.parse(raw); if (Array.isArray(v.msgs)) setMsgs(v.msgs.filter((m: Msg) => m && typeof m.content === 'string' && ['user','assistant'].includes(m.role)).slice(-24)); setTurns(v.day === new Date().toISOString().slice(0,10) ? Number(v.turns) || 0 : 0); const sc = SCENARIOS.find(x => x.id === v.scenario); if (sc) setScenario(sc); } } catch { /* damaged local history */ }
     setHydratedKey(historyKey);
   }, [historyKey, profile?.id]);
@@ -58,17 +62,19 @@ export default function TutorPage() {
 
   useEffect(() => () => { generation.current++; }, []);
 
-  async function send(text?: string) {
+  async function send(text?: string, retry = false) {
     const body = (text ?? input).trim();
-    if (!body || sending.current || hydratedKey !== historyKey) return;
+    if ((!body && !retry) || sending.current || remaining > 0 || isLocal() || hydratedKey !== historyKey) return;
     sending.current = true; const requestGeneration = generation.current;
-    setInput(''); setFail(null);
-    const next: Msg[] = [...msgs, { role: 'user', content: body }];
+    if (!retry) setInput(''); setFail(null);
+    const next: Msg[] = retry && pending ? pending : [...msgs, { role: 'user', content: body }];
+    setPending(next);
     setMsgs(next); setBusy(true);
-    const res = await callAi<TutorReply>('tutor', { level: profile?.level_cefr ?? 'A1', scenario: scenario.s, messages: next.map((m) => ({ role: m.role, content: m.content })) });
+    const res = await callAi<TutorReply>('tutor', { level: profile?.level_cefr ?? 'A1', scenario: scenario.s, messages: next.slice(-6).map((m) => ({ role: m.role, content: m.content })) });
     if (requestGeneration !== generation.current) return;
     sending.current = false; setBusy(false);
     if (res.ok) {
+      setPending(null);
       setMsgs([...next, { role: 'assistant', content: res.data.reply_tr, data: res.data }]);
       const nt = turns + 1; setTurns(nt);
       if (nt <= settings.ai.tutor_max_turns) {
@@ -76,7 +82,7 @@ export default function TutorPage() {
         const r = await addXp(settings.xp.tutor_turn ?? 3, 'tutor');
         if (r?.leveled_up) push({ kind: 'xp', icon: '🆙', title: l({ uz: `${r.level}-daraja!`, tr: `${r.level}. seviye!` }) });
       }
-    } else setFail(res);
+    } else { setClock(Date.now()); setFail(res); }
   }
 
   const insert = (c: string) => { const el = ref.current; if (!el) return setInput(input + c); const s = el.selectionStart ?? input.length; setInput(input.slice(0, s) + c + input.slice(el.selectionEnd ?? s)); requestAnimationFrame(() => { el.focus(); el.setSelectionRange(s + 1, s + 1); }); };
@@ -87,7 +93,7 @@ export default function TutorPage() {
         right={<button className="chip" onClick={() => setShowUz(!showUz)}>{showUz ? l({ uz: 'UZ: yoqilgan', tr: 'UZ: açık' }) : l({ uz: 'UZ: o‘chiq', tr: 'UZ: kapalı' })}</button>} />
       <div className="mb-4 rounded-2xl border border-teal-400/20 bg-teal-500/10 p-4 text-sm"><b>Shaxsiy murabbiy</b><p className="mt-1 text-ink-300">Suhbat o‘rganilgan so‘zlaringiz va xatolaringizga moslanadi. Faqat tanish so‘zlardan aniq mashq uchun:</p><Link href="/coach" className="mt-2 inline-flex text-teal-300 underline">5 daqiqalik shaxsiy mashq →</Link></div>
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {SCENARIOS.map((s) => <button key={s.id} disabled={busy} onClick={() => { setScenario(s); setMsgs([]); }} className={cn('chip shrink-0 py-1.5 text-sm', scenario.id === s.id && 'border-fuchsia-400 bg-fuchsia-500/20 text-white')}>{l(s.t)}</button>)}
+        {SCENARIOS.map((s) => <button key={s.id} disabled={busy} onClick={() => { setScenario(s); setMsgs([]); setPending(null); }} className={cn('chip shrink-0 py-1.5 text-sm', scenario.id === s.id && 'border-fuchsia-400 bg-fuchsia-500/20 text-white')}>{l(s.t)}</button>)}
       </div>
 
       <div className="card flex-1 space-y-3 overflow-y-auto p-4">
@@ -120,7 +126,8 @@ export default function TutorPage() {
         {busy && <div className="text-sm text-ink-400">{l({ uz: 'AI yozmoqda…', tr: 'AI yazıyor…' })}</div>}
         {fail && (
           <div className="rounded-2xl border border-gold-400/30 bg-gold-400/10 p-3 text-sm text-gold-100">
-            <b>{fail.reason === 'quota' ? l({ uz: '⏳ AI dam olmoqda.', tr: '⏳ AI dinleniyor.' }) : fail.reason === 'disabled' ? l({ uz: '🔌 AI sozlanmagan.', tr: '🔌 AI ayarlanmamış.' }) : `⚠️ ${t('error')}.`}</b> {fail.message}
+            <b>{fail.reason === 'quota' ? l({ uz: '⏳ AI limiti vaqtincha tugadi.', tr: '⏳ AI dinleniyor.' }) : fail.reason === 'disabled' ? l({ uz: '🔌 AI sozlanmagan.', tr: '🔌 AI ayarlanmamış.' }) : `⚠️ ${t('error')}.`}</b> {fail.message}
+            {pending && <button className="btn-secondary mt-2 w-full" disabled={busy || remaining > 0} onClick={() => send(undefined, true)}>{remaining > 0 ? `Qayta urinish: ${remaining} soniyadan so‘ng` : 'Shu xabarni qayta yuborish'}</button>}
             {fail.retryAt && <div className="text-xs">{l({ uz: 'Qayta', tr: 'Tekrar' })}: {new Date(fail.retryAt).toLocaleTimeString('uz-UZ')}</div>}
             <div className="mt-1 text-xs">{l({ uz: 'Shu paytda ', tr: 'Bu arada ' })}<Link className="underline" href="/learn">{l({ uz: 'dialog darslari', tr: 'diyalog dersleri' })}</Link>{l({ uz: 'ni o‘ynang — ular AI’siz ishlaydi.', tr: ' oynayın — AI olmadan çalışır.' })}</div>
           </div>
@@ -134,8 +141,8 @@ export default function TutorPage() {
         <div className="mt-2 flex items-center justify-between gap-2">
           <TurkishKeys onInsert={insert} />
           <div className="flex gap-1">
-            <button disabled={busy} className="btn-ghost px-2 py-1 text-xs" onClick={() => { setMsgs([]); }}>{l({ uz: 'Tozalash', tr: 'Temizle' })}</button>
-            <button className="btn-primary px-3 py-2" onClick={() => send()} disabled={busy || !input.trim()}><Send size={16} /></button>
+            <button disabled={busy} className="btn-ghost px-2 py-1 text-xs" onClick={() => { setMsgs([]); setPending(null); }}>{l({ uz: 'Tozalash', tr: 'Temizle' })}</button>
+            <button className="btn-primary px-3 py-2" onClick={() => send()} aria-label="Xabar yuborish" disabled={busy || remaining > 0 || isLocal() || !input.trim()}><Send size={16} /></button>
           </div>
         </div>
       </div>

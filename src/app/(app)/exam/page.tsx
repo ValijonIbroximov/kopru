@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useProfile } from '@/components/AppShell';
 import { useToast } from '@/components/Toast';
-import { fetchWords, fetchGrammar, fetchLessonProgress, fetchLessons, callAi, addXp, finishSession, isLocal } from '@/lib/data';
+import { fetchUserWords, fetchWords, fetchGrammar, fetchLessonProgress, fetchLessons, callAi, addXp, finishSession, isLocal } from '@/lib/data';
+import { practiceAverage, validWriting } from '@/lib/exam-score';
 import { knownWords } from '@/components/exercises/GamePage';
 import { buildExamSections } from '@/lib/exercises';
 import ExerciseRunner from '@/components/exercises/ExerciseRunner';
@@ -34,16 +35,24 @@ export default function ExamPage() {
   const [busy, setBusy] = useState(false);
   const [selfScore, setSelfScore] = useState(0);
   const [loading, setLoading] = useState(false);
+  const awarded = useRef(false);
+  const [startError, setStartError] = useState('');
   const level = profile?.level_cefr ?? 'A1';
 
   async function start() {
     setLoading(true);
-    const [all, g, lp, lessons] = await Promise.all([fetchWords(), fetchGrammar(), fetchLessonProgress(), fetchLessons()]);
-    const words = knownWords(all, lessons, lp, 40);
-    const s = buildExamSections(words, g, settings.exam);
-    setEx([...s.listening, ...s.reading, ...s.speaking]);
-    setLoading(false);
-    setPhase('objective');
+    setStartError(''); awarded.current = false;
+    try {
+      const [all, g, lp, lessons, uw] = await Promise.all([fetchWords(), fetchGrammar(), fetchLessonProgress(), fetchLessons(), fetchUserWords()]);
+      const words = knownWords(all, lessons, lp, 40, uw);
+      if (words.length < 4) { setStartError('Avval darslarda kamida 4 ta so‘z bilan mashq qiling. Yoki quyidagi to‘rt ko‘nikma mashqlarini oching.'); return; }
+      const completed = new Set(lp.filter(x => x.status === 'completed').map(x => x.lesson_id));
+      const s = buildExamSections(words, g.filter(x => x.lesson_id !== null && completed.has(x.lesson_id)), settings.exam);
+      const exercises = [...s.listening, ...s.reading, ...s.speaking];
+      if (!exercises.length) { setStartError('Mos mashqlar topilmadi. To‘rt ko‘nikma sahifasidan foydalaning.'); return; }
+      setEx(exercises); setPhase('objective');
+    } catch { setStartError('Mashqlar yuklanmadi. Internetni tekshirib, qayta urinib ko‘ring.'); }
+    finally { setLoading(false); }
   }
 
   async function submitWriting() {
@@ -51,8 +60,8 @@ export default function ExamPage() {
     setBusy(true); setFbErr(null);
     const res = await callAi<Feedback>('exam_writing', { level, task: WRITING_TASKS[level], text });
     setBusy(false);
-    if (res.ok) setFb(res.data);
-    else setFbErr(res.message);
+    if (res.ok && validWriting(res.data)) setFb(res.data);
+    else setFbErr(res.ok ? 'AI javobi baholash talablariga mos kelmadi.' : res.message);
     setPhase('report');
   }
 
@@ -63,11 +72,12 @@ export default function ExamPage() {
   }, [summary, ex]);
 
   useEffect(() => {
-    if (phase !== 'report' || !summary || !sections) return;
+    if (phase !== 'report' || !summary || !sections || awarded.current) return;
+    awarded.current = true;
     (async () => {
-      const w = fb ? fb.score / 10 : selfScore / 5;
-      const pct = (s: { c: number; t: number }) => (s.t ? s.c / s.t : 0);
-      const overall = Math.round(((pct(sections.listening) + pct(sections.reading) + pct(sections.speaking) + w) / 4) * 100);
+      const w = fb ? fb.score * 10 : isLocal() ? selfScore * 20 : null;
+      const pct = (s: { c: number; t: number }) => (s.t ? 100 * s.c / s.t : null);
+      const overall = practiceAverage([pct(sections.listening), pct(sections.reading), pct(sections.speaking), w]);
       await finishSession(null, 'exam', Math.max(5, Math.round(summary.durationSec / 60)), false);
       const xp = Math.round((settings.xp.exam ?? 50) * Math.max(0.3, overall / 100));
       await addXp(xp, 'exam', { overall });
@@ -79,7 +89,7 @@ export default function ExamPage() {
   if (phase === 'intro') {
     return (
       <div className="mx-auto max-w-2xl">
-        <PageHeader title={`🎓 ${t('exam')}`} sub={l({ uz: 'Milliy sertifikat (Multi-level) formatiga yaqin: Tinglash → O‘qish → Gapirish → Yozish. Haqiqiy imtihon tartibi va ballarini rasmiy uzbmb.uz saytidan tekshiring.', tr: 'Ulusal sertifika (Multi-level) formatına yakın: Dinleme → Okuma → Konuşma → Yazma. Gerçek sınav düzenini ve puanlarını resmi uzbmb.uz sitesinden kontrol edin.' })} />
+        <PageHeader title={`🎓 ${t('exam')}`} sub={l({ uz: 'Qisqa mashq sinovi, rasmiy imtihon simulyatori emas: Tinglash → O‘qish → Gapirish → Yozish. Haqiqiy imtihon tartibi va ballarini rasmiy uzbmb.uz saytidan tekshiring.', tr: 'Kısa alıştırma testi; resmi sınav simülasyonu değildir: Dinleme → Okuma → Konuşma → Yazma. Gerçek sınav düzenini ve puanlarını resmi uzbmb.uz sitesinden kontrol edin.' })} />
         <div className="card p-5">
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             {[[l({ uz: '🎧 Tinglash', tr: '🎧 Dinleme' }), settings.exam.listening], [l({ uz: '📖 O‘qish', tr: '📖 Okuma' }), settings.exam.reading], [l({ uz: '🎙️ Gapirish', tr: '🎙️ Konuşma' }), settings.exam.speaking], [l({ uz: '✍️ Yozish', tr: '✍️ Yazma' }), 1]].map(([label, n]) => (
@@ -87,6 +97,8 @@ export default function ExamPage() {
             ))}
           </div>
           <div className="mt-4 text-sm text-ink-200">{t('level')}: <b className="text-white">{level}</b> {l({ uz: '(profilda o‘zgartiring).', tr: '(profilden değiştirin).' })} {l({ uz: `Taxminiy vaqt: ${settings.exam.time_min} daqiqa. Yozma qism AI tomonidan baholanadi; AI mavjud bo‘lmasa — o‘z-o‘zini baholash ro‘yxati.`, tr: `Tahmini süre: ${settings.exam.time_min} dakika. Yazma bölümü AI tarafından değerlendirilir; AI yoksa — öz değerlendirme listesi.` })}</div>
+          <Link href="/certificate" className="btn-secondary mt-4 w-full">To‘rt ko‘nikma: matn, audio, yozish va gapirish →</Link>
+          {startError && <p role="alert" className="mt-3 text-rose-200">{startError}</p>}
           <button className="btn-primary mt-5 w-full" onClick={start} disabled={loading}>{loading ? l({ uz: 'Tayyorlanmoqda…', tr: 'Hazırlanıyor…' }) : l({ uz: 'Imtihonni boshlash →', tr: 'Sınava başla →' })}</button>
         </div>
       </div>
@@ -103,7 +115,7 @@ export default function ExamPage() {
         <PageHeader title={l({ uz: '✍️ Yozish', tr: '✍️ Yazma' })} sub={`${t('level')} ${level}`} />
         <div className="card p-5">
           <div className="rounded-2xl bg-white/[0.04] p-3 text-sm text-white">{WRITING_TASKS[level]}</div>
-          <textarea className="input mt-3 min-h-40" value={text} onChange={(e) => setText(e.target.value)} placeholder="Buraya yazın…" />
+          <textarea aria-label="Yozma javob" maxLength={4000} className="input mt-3 min-h-40" value={text} onChange={(e) => setText(e.target.value)} placeholder="Buraya yazın…" />
           <div className="mt-2 flex items-center justify-between"><TurkishKeys onInsert={(c) => setText(text + c)} /><span className="text-xs text-ink-400">{text.trim().split(/\s+/).filter(Boolean).length} {t('words')}</span></div>
           {isLocal() && (
             <div className="mt-4 text-sm">
@@ -118,9 +130,9 @@ export default function ExamPage() {
   }
 
   if (!sections || !summary) return <Skeleton className="h-40" />;
-  const pct = (s: { c: number; t: number }) => (s.t ? Math.round((s.c / s.t) * 100) : 0);
-  const w = fb ? fb.score * 10 : selfScore * 20;
-  const overall = Math.round((pct(sections.listening) + pct(sections.reading) + pct(sections.speaking) + w) / 4);
+  const pct = (s: { c: number; t: number }) => (s.t ? Math.round((s.c / s.t) * 100) : null);
+  const w = fb ? fb.score * 10 : isLocal() ? selfScore * 20 : null;
+  const overall = practiceAverage([pct(sections.listening), pct(sections.reading), pct(sections.speaking), w]);
   const band = fb?.band ?? (overall >= 85 ? l({ uz: 'kuchli', tr: 'güçlü' }) : overall >= 65 ? l({ uz: 'o‘rtacha', tr: 'orta' }) : l({ uz: 'boshlang‘ich', tr: 'başlangıç' }));
 
   return (
@@ -129,7 +141,7 @@ export default function ExamPage() {
       <div className="card p-5">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[[l({ uz: '🎧 Tinglash', tr: '🎧 Dinleme' }), pct(sections.listening)], [l({ uz: '📖 O‘qish', tr: '📖 Okuma' }), pct(sections.reading)], [l({ uz: '🎙️ Gapirish', tr: '🎙️ Konuşma' }), pct(sections.speaking)], [l({ uz: '✍️ Yozish', tr: '✍️ Yazma' }), w]].map(([label, v]) => (
-            <div key={String(label)} className="flex flex-col items-center gap-1 text-xs text-ink-300"><ProgressRing value={Number(v)} size={72} stroke={7} color={Number(v) >= 70 ? '#2fd1bc' : '#ff6a2a'}><b className="text-white">{v}%</b></ProgressRing>{label}</div>
+            <div key={String(label)} className="flex flex-col items-center gap-1 text-xs text-ink-300"><ProgressRing value={Number(v)} size={72} stroke={7} color={Number(v) >= 70 ? '#2fd1bc' : '#ff6a2a'}><b className="text-white">{v === null ? '—' : `${v}%`}</b></ProgressRing>{label}</div>
           ))}
         </div>
         {fb && (
@@ -140,8 +152,8 @@ export default function ExamPage() {
           </div>
         )}
         {fbErr && <div className="mt-4 rounded-2xl bg-gold-400/10 p-3 text-sm text-gold-100">{l({ uz: `AI baholay olmadi (${fbErr}). Yozma qism hisobga olinmadi — keyinroq AI o‘qituvchida matnni tekshirtiring.`, tr: `AI değerlendiremedi (${fbErr}). Yazma bölümü sayılmadı — daha sonra metni AI öğretmende kontrol ettirin.` })}</div>}
-        <div className="mt-5 text-xs text-ink-400">{l({ uz: 'Tavsiya: eng past bo‘lim —', tr: 'Öneri: en düşük bölüm —' })} <b className="text-white">{[[l({ uz: 'Tinglash', tr: 'Dinleme' }), pct(sections.listening)], [l({ uz: 'O‘qish', tr: 'Okuma' }), pct(sections.reading)], [l({ uz: 'Gapirish', tr: 'Konuşma' }), pct(sections.speaking)], [l({ uz: 'Yozish', tr: 'Yazma' }), w]].sort((a, b) => Number(a[1]) - Number(b[1]))[0][0]}</b>. {l({ uz: 'Shu rejimda ko‘proq o‘ynang.', tr: 'Bu modda daha çok oynayın.' })}</div>
-        <div className="mt-5 grid gap-2"><button className="btn-primary" onClick={() => { setPhase('intro'); setSummary(null); setFb(null); setText(''); }}>{l({ uz: 'Yana topshirish', tr: 'Sınava tekrar gir' })}</button><Link href="/stats" className="btn-secondary">{t('stats')}</Link></div>
+        <p className="mt-4 text-xs text-ink-300">Bu mashq natijasi rasmiy sertifikat bali yoki CEFR darajasi emas. Gapirish foizi faqat mashq javobiga moslikni bildiradi. Baholanmagan bo‘limlar o‘rtachaga kiritilmaydi.</p><div className="mt-5 text-xs text-ink-400">{l({ uz: 'Tavsiya: eng past bo‘lim —', tr: 'Öneri: en düşük bölüm —' })} <b className="text-white">{[[l({ uz: 'Tinglash', tr: 'Dinleme' }), pct(sections.listening)], [l({ uz: 'O‘qish', tr: 'Okuma' }), pct(sections.reading)], [l({ uz: 'Gapirish', tr: 'Konuşma' }), pct(sections.speaking)], [l({ uz: 'Yozish', tr: 'Yazma' }), w]].filter(x => x[1] !== null).sort((a, b) => Number(a[1]) - Number(b[1]))[0][0]}</b>. {l({ uz: 'Shu rejimda ko‘proq o‘ynang.', tr: 'Bu modda daha çok oynayın.' })}</div>
+        <div className="mt-5 grid gap-2"><button className="btn-primary" onClick={() => { setPhase('intro'); setSummary(null); setFb(null); setFbErr(null); setSelfScore(0); setText(''); }}>{l({ uz: 'Yana topshirish', tr: 'Sınava tekrar gir' })}</button><Link href="/stats" className="btn-secondary">{t('stats')}</Link></div>
       </div>
     </div>
   );
