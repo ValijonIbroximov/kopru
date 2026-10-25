@@ -261,3 +261,16 @@ src/app/api/             ai, ai/jobs, tts, cron/daily, health
 - **Interfeys tili: O‘zbekcha / Turkcha** — onboarding, yon panel va profilda almashtiriladi, profilga saqlanadi.
 - **O‘yinlarda faqat o‘rganilgan so‘zlar** (havza paneli: «faqat o‘rganilgan» / «yangi so‘zlar ham»), misol jumlalarini 🔊 eshitish.
 - **Reyting → profil**: statistikada umumiy reyting, `/u/username` ochiq profil, do‘st qo‘shish, chat, chaqiriq, klubga taklif.
+
+---
+
+## 11. 7-yangilanish (v7) — qisqacha
+
+> To‘liq tavsif: **UPDATE-7-UZ.md**. Yangi paket/SQL/env talab qilinmaydi.
+
+- **Tezlik**: middleware endi har navigatsiyada Supabase Auth’ga murojaat qilmaydi; kartalarda `backdrop-blur` yo‘q; kontent localStorage’da keshlanadi; fon rejimi qurilmaga moslashadi.
+- **Logo → bosh panel**; dars sahifasining «abadiy yuklanish» xatosi tuzatildi.
+- **TTS diagnostikasi** `/api/tts/status` + Profil/Admin’da «hozirgi ovoz manbai»; ixtiyoriy **Azure Speech** (rasmiy, bepul F0) provayderi; Edge 403 avtomatik tuzatish.
+- **AI model narvoni** (Groq/Gemini/Mistral ichida bepul modellar almashinadi), qisqa Retry-After bilan qayta urinish.
+- **🎙️ Ovozli AI suhbat** (brauzer mikrofoni → AI → neyron ovoz → yana tinglash) — bepul.
+- O‘yin oldidan yangi so‘zlar tanishtiruvi ≤ 10 ta.

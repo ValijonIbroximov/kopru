@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, BookOpen, Gamepad2, BarChart3, User, Shield, Trophy, Bot, Users, Landmark, CalendarCheck } from 'lucide-react';
@@ -11,7 +11,7 @@ import { ToastProvider } from './Toast';
 import ThemeBackground from './visual/ThemeBackground';
 import NotificationBell, { NotificationsProvider } from './social/NotificationBell';
 import { LangProvider, useLang, LangSwitch, type Lang } from '@/lib/i18n';
-import { applyTheme, currentThemeId, DEFAULT_THEME, type Ambient } from '@/lib/themes';
+import { applyTheme, currentThemeId, currentAmbient, DEFAULT_THEME, type Ambient } from '@/lib/themes';
 import { stopSpeech, setVoicePref, type VoicePref } from '@/lib/speech';
 
 export const BRAND = 'TezBil';
@@ -43,9 +43,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [ambient, setAmbient] = useState<Ambient>('lite');
   useEffect(() => {
     setThemeId(currentThemeId());
-    try { const a = localStorage.getItem('tezbil.ambient') as Ambient | null; if (a) setAmbient(a); } catch { /* noop */ }
+    setAmbient(currentAmbient());
     const onTheme = (e: Event) => setThemeId((e as CustomEvent<string>).detail);
     const onAmb = (e: Event) => setAmbient((e as CustomEvent<Ambient>).detail);
+    // CSS uchun (shisha effekti faqat jonli fonda)
+    const sync = () => { try { document.documentElement.dataset.ambient = currentAmbient(); } catch { /* noop */ } };
+    sync();
     window.addEventListener('tezbil:theme', onTheme); window.addEventListener('tezbil:ambient', onAmb);
     return () => { window.removeEventListener('tezbil:theme', onTheme); window.removeEventListener('tezbil:ambient', onAmb); };
   }, []);
@@ -59,6 +62,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (ps.ambient && ps.ambient !== applied.current.ambient) { applied.current.ambient = ps.ambient; setAmbient(ps.ambient); }
     if (ps.voice && ps.voice !== applied.current.voice) { applied.current.voice = ps.voice; setVoicePref(ps.voice); }
   }, [profile]);
+
+  useEffect(() => { try { document.documentElement.dataset.ambient = ambient; } catch { /* noop */ } }, [ambient]);
 
   const ctx = useMemo(() => ({ profile, settings, refresh, loading }), [profile, settings, refresh, loading]);
   const ps = (profile?.settings ?? {}) as { lang?: Lang };
@@ -119,7 +124,7 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
       <div className="mx-auto flex min-h-screen max-w-6xl">
         <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-white/[0.06] bg-ink-950/50 p-4 backdrop-blur-sm md:flex">
           <div className="mb-5 flex items-center justify-between px-2">
-            <Link href="/" aria-label="Bosh sahifa" className="flex items-center gap-2 font-display text-xl font-bold"><Logo /> {BRAND}</Link>
+            <Link href="/dashboard" aria-label="Bosh sahifa" className="flex items-center gap-2 font-display text-xl font-bold"><Logo /> {BRAND}</Link>
             {profile && <NotificationBell />}
           </div>
           <nav className="space-y-1">
@@ -155,7 +160,7 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
         <div className="flex min-w-0 flex-1 flex-col">
           {!inSession && (
             <header className={cn('sticky top-0 z-30 flex items-center justify-between px-4 py-3 transition-all md:hidden', scrolled ? 'glass border-b border-white/[0.08] shadow-card' : 'bg-transparent')}>
-              <Link href="/" aria-label="Bosh sahifa" className="flex items-center gap-2 font-display text-lg font-bold"><Logo small /> {BRAND}</Link>
+              <Link href="/dashboard" aria-label="Bosh sahifa" className="flex items-center gap-2 font-display text-lg font-bold"><Logo small /> {BRAND}</Link>
               {profile && (
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="chip">🔥 {profile.streak}</span>
@@ -188,11 +193,13 @@ function Shell({ children, profile, loading, themeId, ambient }: { children: Rea
 }
 
 export function Logo({ small = false }: { small?: boolean }) {
+  // Gradient id har nusxada noyob: bir xil id yashirin (display:none) SVG ichida bo'lsa, ko'rinadigan logoda chaqmoq chizilmay qolardi
+  const gid = `tbg-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <svg viewBox="0 0 128 128" className={small ? 'h-6 w-6' : 'h-7 w-7'} aria-hidden>
-      <defs><linearGradient id="tbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffcf4d" /><stop offset=".55" stopColor="#ff8f4d" /><stop offset="1" stopColor="#f43f6e" /></linearGradient></defs>
+      <defs><linearGradient id={gid} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffcf4d" /><stop offset=".55" stopColor="#ff8f4d" /><stop offset="1" stopColor="#f43f6e" /></linearGradient></defs>
       <rect width="128" height="128" rx="30" fill="#0d1427" />
-      <path d="M70 14 L34 70 L60 70 L52 114 L94 52 L68 52 Z" fill="url(#tbg)" />
+      <path d="M70 14 L34 70 L60 70 L52 114 L94 52 L68 52 Z" fill={`url(#${gid})`} />
       <path d="M18 100 Q64 72 110 100" stroke="#2fd1bc" strokeWidth="6" fill="none" strokeLinecap="round" />
     </svg>
   );

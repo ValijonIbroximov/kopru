@@ -16,8 +16,9 @@ export const EDGE_VOICES: Record<string, string> = {
 };
 
 /** Sec-MS-GEC: SHA256(ticks(5 daqiqaga yaxlitlangan Windows FILETIME) + token), katta harf hex */
+let clockSkewMs = 0; // server soati bilan farq (403 bo'lsa Date sarlavhasidan tuzatiladi)
 function secMsGec(): string {
-  const unix = Math.floor(Date.now() / 1000) + 11644473600; // 1601 dan boshlab soniyalar
+  const unix = Math.floor((Date.now() + clockSkewMs) / 1000) + 11644473600; // 1601 dan boshlab soniyalar
   const rounded = unix - (unix % 300);
   const ticks = BigInt(rounded) * 10_000_000n;
   return createHash('sha256').update(`${ticks}${TRUSTED_CLIENT_TOKEN}`).digest('hex').toUpperCase();
@@ -31,7 +32,8 @@ function dateStr() {
   return new Date().toString().replace(/\(.*\)/, '(Coordinated Universal Time)');
 }
 
-export function edgeSynthesize(text: string, voice = EDGE_VOICES.emel, rate = '+0%', pitch = '+0Hz', timeoutMs = 12000): Promise<Buffer> {
+/** Bir urinish; 403 bo'lsa server vaqtidan soat farqini hisoblab, chaqiruvchi qayta uradi */
+function edgeSynthesizeOnce(text: string, voice: string, rate: string, pitch: string, timeoutMs: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const connId = randomUUID().replace(/-/g, '');
     const url = `${WSS}?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${secMsGec()}&Sec-MS-GEC-Version=1-${CHROMIUM}&ConnectionId=${connId}`;
@@ -67,9 +69,45 @@ export function edgeSynthesize(text: string, voice = EDGE_VOICES.emel, rate = '+
         if (txt.includes('Path:turn.end')) finish(chunks.length ? undefined : new Error('edge-tts: bo‘sh audio'));
       }
     });
+    ws.on('unexpected-response', (_req, res) => {
+      // 403 — ko'pincha soat farqi (Sec-MS-GEC 5 daqiqalik oynaga bog'liq). Server Date sarlavhasidan farqni olamiz.
+      const dateHdr = res.headers?.date;
+      if (res.statusCode === 403 && dateHdr) { const serverMs = Date.parse(String(dateHdr)); if (Number.isFinite(serverMs)) clockSkewMs = serverMs - Date.now(); }
+      finish(new Error(`edge-tts HTTP ${res.statusCode}`));
+    });
     ws.on('error', (e) => finish(e instanceof Error ? e : new Error(String(e))));
     ws.on('close', () => { if (!done) finish(chunks.length ? undefined : new Error('edge-tts: ulanish yopildi')); });
   });
+}
+
+export async function edgeSynthesize(text: string, voice = EDGE_VOICES.emel, rate = '+0%', pitch = '+0Hz', timeoutMs = 12000): Promise<Buffer> {
+  try { return await edgeSynthesizeOnce(text, voice, rate, pitch, timeoutMs); }
+  catch (e) {
+    // 403 dan keyin soat farqi tuzatilgan bo'lsa — bir marta qayta
+    if (/403/.test(String((e as Error).message))) return edgeSynthesizeOnce(text, voice, rate, pitch, timeoutMs);
+    throw e;
+  }
+}
+
+/**
+ * Azure Speech (RASMIY, bepul F0 tier: oyiga 500 000 belgi neyron ovoz). Ixtiyoriy:
+ * AZURE_SPEECH_KEY + AZURE_SPEECH_REGION (masalan, westeurope). Sozlangan bo'lsa birinchi navbatda ishlatiladi —
+ * Edge protokoli o'zgarsa ham ovoz sifati saqlanadi. Ovozlar aynan tr-TR-EmelNeural / tr-TR-AhmetNeural.
+ */
+export function azureConfigured() { return Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION); }
+export async function azureSynthesize(text: string, voice = EDGE_VOICES.emel, rate = '+0%', timeoutMs = 8000): Promise<Buffer> {
+  const key = process.env.AZURE_SPEECH_KEY; const region = process.env.AZURE_SPEECH_REGION;
+  if (!key || !region) throw new Error('azure: sozlanmagan');
+  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='tr-TR'><voice name='${voice}'><prosody rate='${rate}'>${escapeXml(text)}</prosody></voice></speak>`;
+  const res = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+    method: 'POST', signal: AbortSignal.timeout(timeoutMs),
+    headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3', 'User-Agent': 'TezBil' },
+    body: ssml,
+  });
+  if (!res.ok) throw new Error(`azure ${res.status}: ${(await res.text()).slice(0, 120)}`);
+  const ab = await res.arrayBuffer();
+  if (ab.byteLength < 500) throw new Error('azure: bo‘sh audio');
+  return Buffer.from(ab);
 }
 
 /** Google Translate TTS (zaxira; ≤ 200 belgi) */

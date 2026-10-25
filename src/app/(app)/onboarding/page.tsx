@@ -6,7 +6,7 @@ import { ThemePicker, AmbientPicker } from '@/components/ThemePicker';
 import { VoicePicker } from '@/components/VoicePicker';
 import { updateProfile } from '@/lib/data';
 import { LANGS, useLang, type Lang } from '@/lib/i18n';
-import { currentThemeId, type Ambient } from '@/lib/themes';
+import { currentThemeId, currentAmbient, type Ambient } from '@/lib/themes';
 import { getVoicePref, speak, ttsAvailable, type VoicePref } from '@/lib/speech';
 import { LEVEL_ORDER, LEVEL_WORDS } from '@/lib/plan';
 import type { Cefr } from '@/lib/types';
@@ -44,7 +44,7 @@ export default function Onboarding() {
   const [voice, setVoice] = useState<VoicePref>('emel');
   const [busy, setBusy] = useState(false);
   const total = 7;
-  useEffect(() => { setTheme(currentThemeId()); setVoice(getVoicePref()); }, []);
+  useEffect(() => { setTheme(currentThemeId()); setVoice(getVoicePref()); setAmbient(currentAmbient()); }, []);
   useEffect(() => { if (profile?.display_name && !name) setName(profile.display_name); }, [profile, name]);
 
   // maqsad daraja — hozirgi darajadan bir pog'ona yuqori (kamida A2)

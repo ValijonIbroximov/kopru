@@ -16,6 +16,8 @@ export default function AdminAi() {
   const [jobs, setJobs] = useState<AiJob[]>([]);
   const [cache, setCache] = useState<{ count: number; hits: number; kinds: Record<string, number> } | null>(null);
   const [ai, setAi] = useState<Record<string, unknown> | null>(null);
+  const [tts, setTts] = useState<{ active: string; activeLabel: string; forced: string | null; providers: Record<string, { configured: boolean; ok: boolean; ms: number | null; error: string | null }>; storage: { configured: boolean; ok: boolean; error: string | null } } | null>(null);
+  useEffect(() => { fetch('/api/tts/status').then((r) => r.json()).then(setTts).catch(() => setTts(null)); }, []);
 
   const load = useCallback(async () => {
     const sb = supabaseBrowser();
@@ -64,6 +66,22 @@ export default function AdminAi() {
   return (
     <div className="space-y-5">
       <PageHeader title="AI boshqaruvi" sub="Provayderlar zanjiri, limitlar, kesh va navbat. Kalitlar faqat Vercel Environment Variables da." />
+
+      {/* TTS (turkcha nutq) holati */}
+      <section className="card p-4 text-sm">
+        <div className="mb-2 flex items-center justify-between"><h2 className="font-display text-lg font-bold">🔊 Turkcha nutq (TTS)</h2><a className="text-xs text-ember-300 underline" href="/api/tts/status" target="_blank" rel="noreferrer">/api/tts/status</a></div>
+        {!tts ? <div className="text-xs text-ink-400">Tekshirilmoqda…</div> : (
+          <div className="space-y-2">
+            <div className={cn('rounded-xl px-3 py-2 text-xs', tts.active === 'azure' || tts.active === 'edge' ? 'bg-teal-500/10 text-teal-100' : tts.active === 'google' ? 'bg-gold-400/10 text-gold-100' : 'bg-rose-500/10 text-rose-100')}>Hozirgi manba: <b>{tts.activeLabel}</b>{tts.forced ? ` · TTS_PROVIDER=${tts.forced}` : ''}</div>
+            <div className="grid gap-2 sm:grid-cols-3 text-xs">
+              {(['azure', 'edge', 'google'] as const).map((k) => { const pr = tts.providers[k]; return (
+                <div key={k} className="card-soft p-3"><div className="font-semibold text-white">{pr.ok ? '🟢' : pr.configured ? '🔴' : '⚪'} {k === 'azure' ? 'Azure Speech (rasmiy, ixtiyoriy)' : k === 'edge' ? 'Microsoft Edge neyron' : 'Google TTS (zaxira)'}</div><div className="text-ink-400">{pr.ok ? `${pr.ms} ms` : pr.error ?? '—'}</div>{k === 'azure' && !pr.configured && <div className="mt-1 text-[11px] text-ink-500">Bepul F0: oyiga 500 000 belgi. Env: AZURE_SPEECH_KEY, AZURE_SPEECH_REGION</div>}</div>
+              ); })}
+            </div>
+            <div className="text-xs text-ink-400">Storage kesh (bucket `tts`): {tts.storage.configured ? (tts.storage.ok ? '🟢 ishlayapti' : `🔴 ${tts.storage.error ?? 'xato'} — 003_tts_storage.sql ishga tushirilganmi?`) : '⚪ SUPABASE_SERVICE_ROLE_KEY yo‘q'}</div>
+          </div>
+        )}
+      </section>
 
       {health && (
         <div className="flex flex-wrap gap-2 text-xs">

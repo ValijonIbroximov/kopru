@@ -5,7 +5,7 @@ import { MODES } from '@/lib/motivation';
 import ThemeBackground from '@/components/visual/ThemeBackground';
 import Reveal, { CountUp, ScrollProgress } from '@/components/visual/Reveal';
 import { LangProvider, LangSwitch, useLang } from '@/lib/i18n';
-import { THEMES, applyTheme, DEFAULT_THEME } from '@/lib/themes';
+import { THEMES, applyTheme, currentAmbient, DEFAULT_THEME, type Ambient } from '@/lib/themes';
 import { Logo, BRAND, AUTHOR } from '@/components/AppShell';
 import { cn } from '@/lib/utils';
 
@@ -35,16 +35,24 @@ const SOCIAL = [
 function LandingInner() {
   const { l, t } = useLang();
   const [theme, setTheme] = useState(DEFAULT_THEME);
-  useEffect(() => { try { setTheme(localStorage.getItem('tezbil.theme') || DEFAULT_THEME); } catch {} }, []);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [ambient, setAmbient] = useState<Ambient>('lite');
+  useEffect(() => {
+    try { setTheme(localStorage.getItem('tezbil.theme') || DEFAULT_THEME); } catch {}
+    setAmbient(currentAmbient());
+    // Kirgan foydalanuvchi uchun tugmalar "Bosh panel"ga olib boradi (to'liq yuklanishda middleware o'zi yo'naltiradi)
+    try { setLoggedIn(/(^|;\s*)sb-[^=]*-auth-token/.test(document.cookie) || Boolean(localStorage.getItem('kopru.local.v1'))); } catch {}
+  }, []);
   function pickTheme(id: string) { setTheme(id); applyTheme(id); }
+  const appHref = loggedIn ? '/dashboard' : '/login';
 
   return (
     <main className="relative">
       <ScrollProgress />
-      <ThemeBackground themeId={theme} />
+      <ThemeBackground themeId={theme} ambient={ambient} />
       <nav className="sticky top-0 z-30 mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
         <Link href="/" aria-label="Bosh sahifa" className="glass rounded-2xl px-3 py-2"><Logo /></Link>
-        <div className="flex items-center gap-2"><LangSwitch className="glass rounded-full" /><Link href="/login?demo=1" className="btn-ghost glass hidden sm:inline-flex">Demo</Link><Link href="/login" className="btn-primary">{t('login')}</Link></div>
+        <div className="flex items-center gap-2"><LangSwitch className="glass rounded-full" />{!loggedIn && <Link href="/login?demo=1" className="btn-ghost glass hidden sm:inline-flex">Demo</Link>}<Link href={appHref} className="btn-primary">{loggedIn ? l({ uz: 'Bosh panel →', tr: 'Panel →' }) : t('login')}</Link></div>
       </nav>
 
       {/* HERO */}
@@ -52,7 +60,7 @@ function LandingInner() {
         <Reveal variant="fade"><span className="chip glass mb-5 py-1.5 text-sm">🇺🇿 → 🇹🇷 · {l({ uz: 'Turk tili · Milliy sertifikat A1 → C1', tr: 'Türkçe · Ulusal sertifika A1 → C1' })}</span></Reveal>
         <Reveal delay={80}><h1 className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-7xl">{l({ uz: 'Turkchani ', tr: 'Türkçeyi ' })}<span className="aurora-text">{l({ uz: 'o‘yin', tr: 'oyunla' })}</span>{l({ uz: ' orqali,', tr: ',' })}<br className="hidden sm:block" /> {l({ uz: 'zerikmasdan o‘rganing', tr: 'sıkılmadan öğrenin' })}</h1></Reveal>
         <Reveal delay={160}><p className="mx-auto mt-6 max-w-2xl text-base text-ink-200 sm:text-lg">{l({ uz: 'Tez boshlab, keyin shijoati so‘nib qoladiganlar uchun yaratilgan. Kuniga 5–10 daqiqa, moslashuvchan reja, har kuni boshqa o‘yin, do‘stlar bilan raqobat, sun’iy intellekt o‘qituvchi — va to‘liq statistika.', tr: 'Hızlı başlayıp sonra hevesi sönenler için tasarlandı. Günde 5–10 dakika, uyarlanabilir plan, her gün farklı oyun, arkadaşlarla rekabet, yapay zekâ öğretmen — ve tam istatistik.' })}</p></Reveal>
-        <Reveal delay={240}><div className="mt-8 flex flex-wrap items-center justify-center gap-3"><Link href="/login" className="btn-primary px-7 py-4 text-base">{l({ uz: 'Bepul boshlash', tr: 'Ücretsiz başla' })}</Link><Link href="/login?demo=1" className="btn-secondary glass px-7 py-4 text-base">{l({ uz: 'Avval ko‘rib chiqish', tr: 'Önce göz at' })}</Link></div></Reveal>
+        <Reveal delay={240}><div className="mt-8 flex flex-wrap items-center justify-center gap-3"><Link href={appHref} className="btn-primary px-7 py-4 text-base">{loggedIn ? l({ uz: 'Davom etish →', tr: 'Devam et →' }) : l({ uz: 'Bepul boshlash', tr: 'Ücretsiz başla' })}</Link><Link href="/login?demo=1" className="btn-secondary glass px-7 py-4 text-base">{l({ uz: 'Avval ko‘rib chiqish', tr: 'Önce göz at' })}</Link></div></Reveal>
         <Reveal delay={320}><div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-ink-300"><span><b className="font-display text-xl text-white"><CountUp value={392} />+</b> {t('words')}</span><span><b className="font-display text-xl text-white"><CountUp value={21} /></b> {l({ uz: 'o‘yin', tr: 'oyun' })}</span><span><b className="font-display text-xl text-white"><CountUp value={13} /></b> {l({ uz: 'grammatika mavzusi', tr: 'dil bilgisi konusu' })}</span><span><b className="font-display text-xl text-white">0</b> {l({ uz: 'so‘m', tr: 'ücret' })}</span></div></Reveal>
         {/* Mavzu tanlash */}
         <Reveal delay={400}>
@@ -125,7 +133,7 @@ function LandingInner() {
               <div className="text-5xl animate-float">⚡</div>
               <h2 className="title mt-4 text-3xl">{l({ uz: 'Bugun birinchi 8 daqiqa', tr: 'Bugün ilk 8 dakika' })}</h2>
               <p className="subtitle mt-2">{l({ uz: 'Birinchi darsdan keyin turkcha salomlashib, o‘zingizni tanishtira olasiz. Merhaba!', tr: 'İlk dersten sonra Türkçe selamlaşıp kendinizi tanıtabilirsiniz. Merhaba!' })}</p>
-              <Link href="/login" className="btn-primary mt-6 px-8 py-4 text-base">{l({ uz: 'Boshlash — bepul', tr: 'Başla — ücretsiz' })}</Link>
+              <Link href={appHref} className="btn-primary mt-6 px-8 py-4 text-base">{loggedIn ? l({ uz: 'Bosh panelga →', tr: 'Panele →' }) : l({ uz: 'Boshlash — bepul', tr: 'Başla — ücretsiz' })}</Link>
             </div>
           </div>
         </Reveal>

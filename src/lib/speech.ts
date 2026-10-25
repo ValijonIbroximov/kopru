@@ -123,6 +123,41 @@ export function listenOnce(timeoutMs = 7000): Promise<SttResult | null> {
   });
 }
 
+/**
+ * Suhbat rejimi uchun tinglash: oraliq natijalar (interim) ko'rsatiladi, gap tugaganda yakuniy matn qaytadi.
+ * `stop()` — foydalanuvchi to'xtatganda; `timeoutMs` — jim tursa avtomatik tugaydi.
+ */
+export function listenLive(opts: { onInterim?: (text: string) => void; timeoutMs?: number; lang?: string } = {}): { result: Promise<SttResult | null>; stop: () => void } {
+  let stopFn = () => {};
+  const result = new Promise<SttResult | null>((resolve) => {
+    if (!sttAvailable()) return resolve(null);
+    const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return resolve(null);
+    const rec = new Ctor();
+    rec.lang = opts.lang ?? 'tr-TR'; rec.interimResults = true; rec.maxAlternatives = 2;
+    let done = false; let finalText = ''; let conf = 0.5;
+    const finish = (r: SttResult | null) => { if (done) return; done = true; clearTimeout(t); try { rec.stop(); } catch { /* noop */ } resolve(r); };
+    const t = setTimeout(() => finish(finalText ? { transcript: finalText, confidence: conf } : null), opts.timeoutMs ?? 12_000);
+    rec.onresult = (e) => {
+      let interim = '';
+      const res = e.results as ArrayLike<ArrayLike<{ transcript: string; confidence: number }> & { isFinal?: boolean }>;
+      for (let i = 0; i < res.length; i++) {
+        const alt = res[i][0]; if (!alt) continue;
+        if ((res[i] as { isFinal?: boolean }).isFinal) { finalText += (finalText ? ' ' : '') + alt.transcript.trim(); conf = alt.confidence ?? conf; }
+        else interim += alt.transcript;
+      }
+      opts.onInterim?.((finalText + ' ' + interim).trim());
+      if (finalText && !interim) finish({ transcript: finalText, confidence: conf });
+    };
+    rec.onerror = () => finish(finalText ? { transcript: finalText, confidence: conf } : null);
+    rec.onend = () => finish(finalText ? { transcript: finalText, confidence: conf } : null);
+    stopFn = () => finish(finalText ? { transcript: finalText, confidence: conf } : null);
+    try { rec.start(); } catch { finish(null); }
+  });
+  return { result, stop: () => stopFn() };
+}
+
 interface SpeechRecognitionLike {
   lang: string; interimResults: boolean; maxAlternatives: number;
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string; confidence: number }>> }) => void) | null;

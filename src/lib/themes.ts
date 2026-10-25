@@ -102,7 +102,33 @@ export function applyTheme(id: string) {
 export function applyAmbient(a: Ambient) {
   if (typeof window === 'undefined') return;
   try { localStorage.setItem('tezbil.ambient', a); } catch { /* noop */ }
+  try { document.documentElement.dataset.ambient = a; } catch { /* noop */ }
   try { window.dispatchEvent(new CustomEvent('tezbil:ambient', { detail: a })); } catch { /* noop */ }
+}
+
+/**
+ * Qurilmaga qarab standart fon rejimi (foydalanuvchi tanlamagan bo'lsa):
+ * kuchli kompyuter → 'full' (jonli), telefon / kuchsiz qurilma / reduced-motion → 'lite' (statik).
+ */
+export function autoAmbient(): Ambient {
+  if (typeof window === 'undefined') return 'lite';
+  try {
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+    const cores = nav.hardwareConcurrency ?? 4;
+    const mem = nav.deviceMemory ?? 8;
+    if (reduced) return 'lite';
+    if (coarse && window.innerWidth < 900) return 'lite';
+    if (cores < 6 || mem < 4) return 'lite';
+    return 'full';
+  } catch { return 'lite'; }
+}
+
+/** Saqlangan yoki avtomatik fon rejimi */
+export function currentAmbient(): Ambient {
+  try { const a = localStorage.getItem('tezbil.ambient') as Ambient | null; if (a === 'full' || a === 'lite' || a === 'off') return a; } catch { /* noop */ }
+  return autoAmbient();
 }
 
 /** Hozir qo'llanilgan mavzu id (localStorage / <html data-theme>) */

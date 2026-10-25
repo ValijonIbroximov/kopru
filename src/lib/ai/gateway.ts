@@ -143,6 +143,26 @@ export interface GatewayCtx {
   enabled?: boolean;
 }
 
+/**
+ * Bepul tier uchun model "narvoni": bitta model limiti (masalan, Groq 70B — kuniga 100K token) tugasa,
+ * shu provayderning boshqa bepul modeli sinab ko'riladi — faqat keyin keyingi provayderga o'tiladi.
+ * Groq limitlari model bo'yicha alohida, shuning uchun bu amalda kunlik sig'imni bir necha barobar oshiradi.
+ * Mavjud bo'lmagan model (404) ham xavfsiz o'tkazib yuboriladi.
+ */
+export const MODEL_LADDER: Record<string, string[]> = {
+  groq: ['openai/gpt-oss-120b', 'meta-llama/llama-4-scout-17b-16e-instruct', 'qwen/qwen3-32b', 'llama-3.1-8b-instant'],
+  gemini: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'],
+  cerebras: ['gpt-oss-120b', 'llama3.1-8b'],
+  openrouter: ['openrouter/free'],
+  mistral: ['open-mistral-nemo', 'mistral-small-latest'],
+};
+function modelsFor(c: Candidate): string[] {
+  const out: string[] = [];
+  for (const m of [c.model, ...(MODEL_LADDER[c.def.id] ?? [])]) if (m && !out.includes(m)) out.push(m);
+  return out;
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /** Faqat provayderlar zanjiri (kesh/navbatsiz) */
 export async function callChain(kind: AiKind, payload: Record<string, unknown>, ctx: Pick<GatewayCtx, 'admin' | 'user'>): Promise<AiResponse> {
   const spec = buildPrompt(kind, payload);
@@ -153,38 +173,70 @@ export async function callChain(kind: AiKind, payload: Record<string, unknown>, 
   let earliest = Infinity;
   const errors: string[] = [];
   let failureReason: 'quota' | 'error' = 'quota';
+  const tried: string[] = [];
   for (const c of candidates) {
     const m = getMem(c.def.id);
     if (m.cooldownUntil > now) { if (m.reason === 'error') failureReason = 'error'; earliest = Math.min(earliest, m.cooldownUntil); continue; }
     if (m.usedToday >= c.cap) { earliest = Math.min(earliest, nextUtcMidnight().getTime()); continue; }
     if (Date.now() >= deadline - 1000) break;
-    const r = await callProvider(c, spec.user, spec.temperature, spec.maxTokens, Math.min(12_000, deadline - Date.now()));
-    if (r.ok) {
-      const data = extractJson(r.content);
-      if (data === null || (kind === 'tutor' && !validTutor(data))) {
-        failureReason = 'error';
-        errors.push('AI javobini o‘qib bo‘lmadi. Qayta urinib ko‘ring.');
-        m.errors += 1;
-        continue;
+
+    let providerDelay = Infinity;      // provayder uchun eng kichik aniq kutish (429 lardan)
+    let hardError: ReturnType<typeof classifyError> | null = null;
+    let parseFailed = false;
+    for (const model of modelsFor(c)) {
+      if (Date.now() >= deadline - 1000) break;
+      tried.push(`${c.def.id}:${model}`);
+      let r = await callProvider({ ...c, model }, spec.user, spec.temperature, spec.maxTokens, Math.min(12_000, deadline - Date.now()));
+      // Qisqa Retry-After (masalan, Mistral 1 so'rov/soniya) — bir marta kutib qayta uramiz
+      if (!r.ok && r.status === 429) {
+        const cls0 = classifyError(r.status, r.body, r.headers);
+        if (cls0.explicitDelay && cls0.cooldownMs <= 3000 && Date.now() + cls0.cooldownMs < deadline - 2000) {
+          await sleep(cls0.cooldownMs);
+          r = await callProvider({ ...c, model }, spec.user, spec.temperature, spec.maxTokens, Math.min(12_000, deadline - Date.now()));
+        }
       }
-      m.usedToday += 1;
-      m.errors = 0; m.cooldownUntil = 0; m.reason = undefined;
-      await persistState(ctx.admin, c.def.id, { inc: true, latency: r.latency, cooldown_until: null });
-      return { ok: true, data, provider: c.def.id, cached: false };
+      if (r.ok) {
+        const data = extractJson(r.content);
+        if (data === null || (kind === 'tutor' && !validTutor(data))) { parseFailed = true; continue; } // boshqa model bilan urinib ko'ramiz
+        m.usedToday += 1;
+        m.errors = 0; m.cooldownUntil = 0; m.reason = undefined;
+        await persistState(ctx.admin, c.def.id, { inc: true, latency: r.latency, cooldown_until: null });
+        return { ok: true, data, provider: c.def.id, cached: false, model };
+      }
+      const cls = classifyError(r.status, r.body, r.headers);
+      const modelMissing = r.status === 404 || (r.status === 400 && /model/i.test(r.body) && /not found|does not exist|unknown|invalid|decommission|unsupported/i.test(r.body));
+      if (cls.reason === 'quota') { providerDelay = Math.min(providerDelay, cls.cooldownMs); m.lastError = cls.diagnostic; continue; }
+      if (modelMissing) { m.lastError = cls.diagnostic; continue; }
+      hardError = cls; break; // kalit/tarmoq/server xatosi — boshqa model yordam bermaydi
     }
-    const cls = classifyError(r.status, r.body, r.headers);
+
     m.errors += 1;
-    m.reason = cls.reason;
-    if (cls.reason === 'error') failureReason = 'error';
-    const backoff = cls.cooldownMs * (cls.explicitDelay ? 1 : Math.min(8, Math.pow(2, Math.max(0, m.errors - 1))));
-    m.cooldownUntil = Date.now() + Math.min(backoff, 24 * 3600_000);
-    m.lastError = cls.diagnostic;
+    if (hardError) {
+      m.reason = 'error'; failureReason = 'error';
+      const backoff = hardError.cooldownMs * (hardError.explicitDelay ? 1 : Math.min(8, Math.pow(2, Math.max(0, m.errors - 1))));
+      m.cooldownUntil = Date.now() + Math.min(backoff, 24 * 3600_000);
+      m.lastError = hardError.diagnostic;
+      errors.push(hardError.message);
+    } else if (Number.isFinite(providerDelay)) {
+      m.reason = 'quota';
+      m.cooldownUntil = Date.now() + Math.min(providerDelay, 24 * 3600_000);
+      errors.push('Bepul AI xizmatining limiti vaqtincha tugadi. Kutish muddati tugagach qayta urinib ko‘ring.');
+    } else {
+      // faqat "model topilmadi" / javob o'qilmadi — qisqa pauza
+      m.reason = parseFailed ? 'error' : 'quota';
+      if (parseFailed) { failureReason = 'error'; errors.push('AI javobini o‘qib bo‘lmadi. Qayta urinib ko‘ring.'); }
+      else errors.push('AI modeli topilmadi — Admin → AI → Model nomini tekshiring.');
+      m.cooldownUntil = Date.now() + 60_000;
+    }
     earliest = Math.min(earliest, m.cooldownUntil);
-    errors.push(cls.message);
-    await persistState(ctx.admin, c.def.id, { err: true, cooldown_until: new Date(m.cooldownUntil).toISOString(), last_error: cls.diagnostic });
+    await persistState(ctx.admin, c.def.id, { err: true, cooldown_until: new Date(m.cooldownUntil).toISOString(), last_error: m.lastError ?? null });
   }
   const retryAt = Number.isFinite(earliest) ? new Date(earliest).toISOString() : null;
-  return { ok: false, reason: failureReason, message: errors[0] || 'AI xizmati vaqtincha band. Kutish muddati tugagach qayta urinib ko‘ring.', retryAt };
+  const configured = candidates.map((c) => c.def.label).join(', ');
+  const hint = candidates.length <= 1
+    ? ' Maslahat: Vercel env’ga bepul GROQ_API_KEY va GEMINI_API_KEY qo‘shing — zanjir shunda deyarli to‘xtamaydi.'
+    : '';
+  return { ok: false, reason: failureReason, message: (errors[0] || 'AI xizmati vaqtincha band. Kutish muddati tugagach qayta urinib ko‘ring.') + hint, retryAt, detail: `Sozlangan: ${configured}. Sinaldi: ${tried.length}` };
 }
 
 /** To'liq oqim: kesh → foydalanuvchi limiti → zanjir → navbat */

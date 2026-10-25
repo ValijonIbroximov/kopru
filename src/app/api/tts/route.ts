@@ -1,14 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createHash } from 'node:crypto';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { edgeSynthesize, googleSynthesize, EDGE_VOICES } from '@/lib/tts/edge';
+import { edgeSynthesize, googleSynthesize, azureSynthesize, azureConfigured, EDGE_VOICES } from '@/lib/tts/edge';
+import { noteTtsResult } from '@/lib/tts/status';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 /**
  * GET /api/tts?text=Merhaba&voice=emel|ahmet&rate=slow|normal
- * Zanjir: Supabase Storage kesh → Edge neyron TTS → Google TTS → 503 (klient brauzer ovoziga o'tadi).
+ * Zanjir: Supabase Storage kesh → Azure Speech (rasmiy, ixtiyoriy kalit) → Edge neyron TTS → Google TTS → 503 (klient brauzer ovoziga o'tadi).
+ * Har natija src/lib/tts/status.ts ga yoziladi — /api/tts/status va Profil → Ovoz bo'limi qaysi manba ishlayotganini ko'rsatadi.
  * Javob: audio/mpeg, 1 yil keshlanadi (URL matn+ovoz bo'yicha deterministik).
  */
 const mem = new Map<string, Buffer>(); // instansiya ichidagi tezkor kesh (Storage bo'lmasa ham ishlaydi)
@@ -39,11 +41,21 @@ export async function GET(req: NextRequest) {
 
   let buf: Buffer | null = null; let source = 'edge';
   const rate = rateKey === 'slow' ? '-30%' : '+0%';
-  if (process.env.TTS_PROVIDER !== 'google') {
-    try { buf = await edgeSynthesize(text, EDGE_VOICES[voiceKey], rate, '+0Hz', 6500); } catch (e) { console.warn('[tts] edge xato:', (e as Error).message); }
+  const forced = process.env.TTS_PROVIDER; // 'azure' | 'edge' | 'google' | undefined
+  if (azureConfigured() && (!forced || forced === 'azure')) {
+    const t0 = Date.now();
+    try { buf = await azureSynthesize(text, EDGE_VOICES[voiceKey], rate); source = 'azure'; noteTtsResult('azure', true, Date.now() - t0); }
+    catch (e) { noteTtsResult('azure', false, Date.now() - t0, (e as Error).message); console.warn('[tts] azure xato:', (e as Error).message); }
+  }
+  if (!buf && forced !== 'google' && forced !== 'azure') {
+    const t0 = Date.now();
+    try { buf = await edgeSynthesize(text, EDGE_VOICES[voiceKey], rate, '+0Hz', 6500); source = 'edge'; noteTtsResult('edge', true, Date.now() - t0); }
+    catch (e) { noteTtsResult('edge', false, Date.now() - t0, (e as Error).message); console.warn('[tts] edge xato:', (e as Error).message); }
   }
   if (!buf) {
-    try { buf = await googleSynthesize(text, rateKey === 'slow'); source = 'google'; } catch (e) { console.warn('[tts] google xato:', (e as Error).message); }
+    const t0 = Date.now();
+    try { buf = await googleSynthesize(text, rateKey === 'slow'); source = 'google'; noteTtsResult('google', true, Date.now() - t0); }
+    catch (e) { noteTtsResult('google', false, Date.now() - t0, (e as Error).message); console.warn('[tts] google xato:', (e as Error).message); }
   }
   if (!buf) return NextResponse.json({ error: 'TTS vaqtincha mavjud emas' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
 

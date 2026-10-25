@@ -208,6 +208,7 @@ export interface AiResult<T = unknown> {
   data: T;
   provider: string;
   cached: boolean;
+  model?: string;
 }
 export interface AiFailure {
   ok: false;
@@ -216,6 +217,8 @@ export interface AiFailure {
   retryAt?: string | null;
   queued?: boolean;
   jobId?: string;
+  /** Texnik qisqa izoh (qaysi provayderlar sozlangan, nechta model sinaldi) — UI da kichik matn */
+  detail?: string;
 }
 export type AiResponse<T = unknown> = AiResult<T> | AiFailure;
 

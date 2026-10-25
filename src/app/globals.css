@@ -37,7 +37,8 @@ html[data-mode="light"] .text-gold-100 { color: #713f12; } html[data-mode="light
 html[data-mode="light"] .shadow-card { box-shadow: 0 10px 30px -18px rgb(var(--overlay) / 0.35); }
 
 @layer components {
-  .card { @apply rounded-3xl border border-white/[0.07] bg-ink-900/80 shadow-card backdrop-blur; }
+  /* backdrop-blur olib tashlandi: jonli canvas ustida har kadrda qayta rasterizatsiya — telefonlarda asosiy "qotish" sababi */
+  .card { @apply rounded-3xl border border-white/[0.07] bg-ink-900/85 shadow-card; }
   .card-soft { @apply rounded-2xl border border-white/[0.06] bg-white/[0.03]; }
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none; }
   .btn-primary { @apply btn bg-gradient-to-r from-ember-500 to-rose-500 text-[#fff] shadow-glow hover:brightness-110; }
@@ -111,7 +112,13 @@ html[data-mode="light"] .shadow-card { box-shadow: 0 10px 30px -18px rgb(var(--o
 .pulse-ring::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid rgb(var(--accent) / .6); animation: pulseRing 1.6s ease-out infinite; }
 .marquee { display: flex; width: max-content; animation: marquee 40s linear infinite; }
 .marquee:hover { animation-play-state: paused; }
-.glass { background: rgb(var(--ink-900) / .62); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); }
+.glass { background: rgb(var(--ink-900) / .82); }
+/* Shisha effekti faqat kuchli qurilmalarda (sichqonchali, keng ekran) — mobil GPU uchun og'ir */
+@media (min-width: 768px) and (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .glass { background: rgb(var(--ink-900) / .62); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); }
+}
+/* Fon o'chiq/yengil bo'lsa blur kerak emas */
+html[data-ambient="off"] .glass, html[data-ambient="lite"] .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgb(var(--ink-900) / .82); }
 .tilt { transition: transform .25s ease, box-shadow .25s ease; }
 .tilt:hover { transform: translateY(-3px) rotate(-.4deg); box-shadow: 0 18px 40px -18px rgba(255,106,42,.45); }
 .coach-hole { box-shadow: 0 0 0 9999px rgb(var(--overlay) / .78), 0 0 0 4px rgb(var(--accent) / .9); border-radius: 18px; }

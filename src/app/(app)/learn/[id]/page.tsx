@@ -36,7 +36,9 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
   useEffect(() => {
     let active = true; setPhase('loading'); setLoadError(''); setResume(null);
     (async () => {
-      const [l, all, g, due, active, lessons, uw, progress, units] = await Promise.all([fetchLesson(lessonId), fetchWords(), fetchGrammar(), fetchDue(8, 0), fetchActiveSession('lesson', lessonId), fetchLessons(), fetchUserWords(), fetchLessonProgress(), fetchUnits()]);
+      // DIQQAT: `activeSession` nomi — tashqi `active` (bekor qilish bayrog'i) bilan to'qnashmasin.
+      // Avval ikkalasi ham `active` deb atalgan edi: davom etadigan sessiya bo'lmasa (null) sahifa abadiy "yuklanmoqda"da qolardi.
+      const [l, all, g, due, activeSession, lessons, uw, progress, units] = await Promise.all([fetchLesson(lessonId), fetchWords(), fetchGrammar(), fetchDue(8, 0), fetchActiveSession('lesson', lessonId), fetchLessons(), fetchUserWords(), fetchLessonProgress(), fetchUnits()]);
       if (!active) return;
       if (!l) { setLoadError('Dars topilmadi.'); return; }
       if (!lessonIsOpen(lessonId, orderedLessons(lessons, units), progress)) { setLoadError('Bu darsga o‘tishdan oldin avvalgi darsni yakunlang.'); return; }
@@ -52,8 +54,8 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
       const unitLessonIds = new Set(lessons.filter((x) => x.unit_id === l.unit_id && (x.id === lessonId || progress.some(p => p.lesson_id === x.id && p.status === 'completed'))).map((x) => x.id));
       setUnitWords(known.filter((w) => w.lesson_id && unitLessonIds.has(w.lesson_id)));
       setUnitGrammar(g.filter((x) => x.lesson_id && unitLessonIds.has(x.lesson_id)));
-      const st = active?.state as RunnerState | undefined;
-      if (active && st && st.curriculumVersion === 2 && Array.isArray(st.queue) && st.index < st.queue.length) setResume({ id: active.id, state: st });
+      const st = activeSession?.state as RunnerState | undefined;
+      if (activeSession && st && st.curriculumVersion === 2 && Array.isArray(st.queue) && st.index < st.queue.length) setResume({ id: activeSession.id, state: st });
       setPhase('intro');
     })().catch(() => { if (active) setLoadError('Dars yuklanmadi. Internetni tekshirib qayta oching.'); });
     return () => { active = false; };
